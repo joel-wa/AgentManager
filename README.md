@@ -75,14 +75,9 @@ The system consists of three main components:
 
 4. **Install Python Services**
    ```bash
-   cd python-services/main_agent
-   pip install -r requirements.txt
-   
-   cd ../maintenance_agent
-   pip install -r requirements.txt
-   
-   cd ../embeddings
-   pip install -r requirements.txt
+   cd python-services
+   uv venv .venv
+   uv sync --group main-agent --group maintenance-agent --group embeddings
    ```
 
 5. **Install Ollama and Gemma**
