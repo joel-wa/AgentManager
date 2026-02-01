@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Initialize clients
-ollama_client = OllamaClient()
+ollama_client = OllamaClient(model="glm-4.6:cloud")
 tool_executor = ToolExecutor()
 
 

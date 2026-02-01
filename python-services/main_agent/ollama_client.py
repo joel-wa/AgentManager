@@ -12,8 +12,8 @@ import os
 
 class OllamaClient:
     def __init__(self, base_url: str = None, model: str = None):
-        self.base_url = base_url or os.getenv("OLLAMA_URL", "http://localhost:11434")
-        self.model = model or os.getenv("OLLAMA_MODEL", "gemma:7b")
+        self.base_url = base_url or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+        self.model = model or os.getenv("OLLAMA_MODEL", "kimi-k2.5:cloud")
         self.timeout = 120.0  # Longer timeout for model inference
     
     async def check_model(self) -> bool:
@@ -56,18 +56,38 @@ class OllamaClient:
                     },
                     timeout=self.timeout
                 )
-                
+
+                if response.status_code == 404:
+                    prompt = self._messages_to_prompt(messages)
+                    response = await client.post(
+                        f"{self.base_url}/api/generate",
+                        json={
+                            "model": self.model,
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                                "top_p": 0.9,
+                            }
+                        },
+                        timeout=self.timeout
+                    )
+
                 if response.status_code == 200:
                     data = response.json()
-                    content = data.get("message", {}).get("content", "")
-                    
+                    content = data.get("message", {}).get("content") or data.get("response", "")
+
                     # Parse for tool calls (simple pattern matching)
                     tool_calls = self._parse_tool_calls(content, tools or [])
-                    
+
                     return content, tool_calls
-                else:
-                    return f"Error: Unable to get response from Ollama ({response.status_code})", None
-                    
+
+                error_detail = self._extract_error(response)
+                if error_detail:
+                    return f"Error: {error_detail}", None
+
+                return f"Error: Unable to get response from Ollama ({response.status_code})", None
+
         except httpx.TimeoutException:
             return "Error: Request timed out. The model might be loading or busy.", None
         except httpx.ConnectError:
@@ -128,6 +148,31 @@ class OllamaClient:
                     })
         
         return tool_calls if tool_calls else None
+
+    def _messages_to_prompt(self, messages: List[Dict[str, str]]) -> str:
+        """Convert chat messages into a single prompt for /api/generate"""
+        lines = []
+        for message in messages:
+            role = message.get("role", "user").strip().lower()
+            content = message.get("content", "")
+            if role == "system":
+                lines.append(f"System: {content}")
+            elif role == "assistant":
+                lines.append(f"Assistant: {content}")
+            else:
+                lines.append(f"User: {content}")
+        lines.append("Assistant:")
+        return "\n".join(lines)
+
+    def _extract_error(self, response: httpx.Response) -> Optional[str]:
+        """Extract error details from an Ollama response if available"""
+        try:
+            data = response.json()
+            if isinstance(data, dict) and data.get("error"):
+                return data.get("error")
+        except Exception:
+            return None
+        return None
     
     def _parse_args(self, args_str: str) -> Dict[str, Any]:
         """Parse tool arguments from string"""
