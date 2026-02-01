@@ -124,14 +124,41 @@ class OllamaClient:
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Parse response content for tool calls
-        Looks for patterns like: [TOOL: search("query")]
+        Supports multiple formats:
+        1. JSON format: ```json{"tool_calls": [...]}```
+        2. Legacy patterns: [TOOL: search("query")], <tool>search("query")</tool>
         """
         tool_calls = []
         
-        # Pattern for tool calls
+        # First, try to parse JSON format (preferred)
+        json_pattern = r'```json\s*\n?({[\s\S]*?})\s*\n?```'
+        json_matches = re.findall(json_pattern, content, re.IGNORECASE | re.MULTILINE)
+        
+        for json_str in json_matches:
+            try:
+                data = json.loads(json_str)
+                if isinstance(data, dict) and "tool_calls" in data:
+                    calls = data["tool_calls"]
+                    if isinstance(calls, list):
+                        for call in calls:
+                            if isinstance(call, dict) and "name" in call and "arguments" in call:
+                                tool_name = call["name"]
+                                if tool_name.lower() in [t.lower() for t in available_tools]:
+                                    tool_calls.append({
+                                        "name": tool_name.lower(),
+                                        "arguments": call["arguments"]
+                                    })
+            except json.JSONDecodeError:
+                pass  # Try legacy patterns
+        
+        # If JSON parsing succeeded, return those calls
+        if tool_calls:
+            return tool_calls
+        
+        # Fall back to legacy text patterns
         patterns = [
             r'\[TOOL:\s*(\w+)\s*\((.*?)\)\]',
-            r'<tool>(\w+)\((.*?)\)</tool>',
+            r'<tool>(\w+)\((.*?)</tool>',
             r'\*\*Tool:\*\*\s*(\w+)\s*\((.*?)\)',
         ]
         

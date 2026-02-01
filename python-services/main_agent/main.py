@@ -10,6 +10,7 @@ from typing import Optional, List, Dict, Any
 import uvicorn
 from datetime import datetime
 import uuid
+import json
 
 from ollama_client import OllamaClient
 from tool_logic import ToolExecutor
@@ -76,8 +77,15 @@ async def chat(request: ChatRequest):
     Process chat message with optional tool usage
     """
     try:
+        # Get full tool schemas
+        tool_schemas = tool_executor.get_tool_schemas() if request.tools else []
+        
+        # Filter to only requested tools
+        if request.tools:
+            tool_schemas = [t for t in tool_schemas if t["name"] in request.tools]
+        
         # Build system prompt with tools
-        system_prompt = build_system_prompt(request.tools)
+        system_prompt = build_system_prompt(tool_schemas)
         
         # Build messages
         messages = []
@@ -126,24 +134,37 @@ async def shutdown():
     return {"status": "shutting_down"}
 
 
-def build_system_prompt(tools: List[str]) -> str:
-    """Build system prompt with available tools"""
+@app.get("/agent/tools")
+async def list_tools():
+    """List all available tools with their schemas"""
+    try:
+        tools = tool_executor.get_tool_schemas()
+        return {
+            "tools": tools,
+            "count": len(tools)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def build_system_prompt(tool_schemas: List[Dict[str, Any]]) -> str:
+    """Build system prompt with available tools and usage instructions"""
     base_prompt = """You are a helpful AI workspace assistant. You help users organize their notes, research, and code files.
 You have access to a workspace where you can search, read, and write files.
 Always be helpful, concise, and accurate. When you need information from the workspace, use the available tools."""
 
-    if tools:
-        tool_descriptions = []
-        for tool in tools:
-            if tool == "search":
-                tool_descriptions.append("- search(query): Search the workspace for relevant content")
-            elif tool == "read_file":
-                tool_descriptions.append("- read_file(path): Read the contents of a file")
-            elif tool == "write_file":
-                tool_descriptions.append("- write_file(path, content): Create or update a file")
+    if tool_schemas:
+        base_prompt += "\n\n# TOOL USAGE INSTRUCTIONS\n"
+        base_prompt += "To use a tool, respond with a JSON object in this EXACT format:\n"
+        base_prompt += "```json\n{\n  \"tool_calls\": [\n    {\n      \"name\": \"tool_name\",\n      \"arguments\": {\"arg1\": \"value1\", \"arg2\": \"value2\"}\n    }\n  ]\n}\n```\n\n"
+        base_prompt += "You can call multiple tools at once by adding more objects to the tool_calls array.\n"
+        base_prompt += "Always include the tool call in a code block with ```json markers.\n\n"
+        base_prompt += "# AVAILABLE TOOLS:\n\n"
         
-        if tool_descriptions:
-            base_prompt += "\n\nAvailable tools:\n" + "\n".join(tool_descriptions)
+        for tool in tool_schemas:
+            base_prompt += f"## {tool['name']}\n"
+            base_prompt += f"Description: {tool['description']}\n"
+            base_prompt += f"Parameters:\n```json\n{json.dumps(tool['parameters'], indent=2)}\n```\n\n"
     
     return base_prompt
 
