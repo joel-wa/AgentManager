@@ -99,6 +99,11 @@ The system consists of three main components:
    cd python-services/main_agent && python main.py
    cd python-services/maintenance_agent && python main.py
    cd python-services/embeddings && python main.py
+
+   # PowerShell
+   cd python-services/main_agent; python main.py
+   cd python-services/maintenance_agent; python main.py
+   cd python-services/embeddings; python main.py
    ```
 
 3. **Start Rust Core**
