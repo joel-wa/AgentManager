@@ -1,0 +1,86 @@
+sequenceDiagram
+    participant User
+    participant UI as Frontend UI
+    participant Rust as Rust Core
+    participant Agent as Main Agent<br/>(Python :8001)
+    participant Maint as Maintenance<br/>(Python :8002)
+    participant Embed as Embeddings<br/>(Python :8003)
+    participant Ollama as Ollama<br/>(Local)
+    participant Qdrant as Vector DB
+    participant FS as File System
+    participant Cloud as Cloud API<br/>(Claude/GPT)
+
+    User->>UI: Types message: "Summarize my auth notes"
+    UI->>Rust: WebSocket: {message, project_id}
+    
+    Note over Rust: Tool Coordinator activated
+    
+    Rust->>Agent: POST /agent/chat<br/>{message, context, tools}
+    Agent->>Ollama: Chat with function calling
+    Ollama-->>Agent: Response with tool_calls:<br/>[search, read_file, write_file]
+    Agent-->>Rust: {response, tool_calls}
+    
+    Note over Rust: Execute tool calls sequentially
+    
+    rect rgb(200, 220, 240)
+        Note over Rust,Qdrant: Tool 1: search("auth notes")
+        Rust->>Embed: POST /embed<br/>{text: "auth notes"}
+        Embed->>Embed: Generate embedding vector
+        Embed-->>Rust: {embedding: [0.1, 0.2, ...]}
+        Rust->>Qdrant: Search similar vectors
+        Qdrant-->>Rust: Top 5 matches with metadata
+        Rust->>Rust: Add to tool results
+    end
+    
+    rect rgb(240, 220, 200)
+        Note over Rust,FS: Tool 2: read_file("auth/strategy.md")
+        Rust->>FS: Read file
+        FS-->>Rust: File content
+        Rust->>Rust: Add to tool results
+    end
+    
+    rect rgb(220, 240, 200)
+        Note over Rust,FS: Tool 3: write_file("summary.md", content)
+        Rust->>FS: Write new file
+        FS-->>Rust: Success
+        Rust->>Rust: Log breadcrumb
+    end
+    
+    Rust-->>UI: Stream response + tool activity
+    UI-->>User: Display chat + "Created summary.md"
+    
+    Note over Rust,Cloud: Background: File change detected
+    
+    par Background Processing
+        Rust->>Embed: POST /embed<br/>{text: file_content}
+        Embed-->>Rust: {embedding}
+        Rust->>Qdrant: Store embedding + metadata
+        
+        and Summary Generation
+        Rust->>Maint: POST /maintenance/summarize<br/>{filepath, content}
+        Maint->>Cloud: Claude API: Generate summary
+        Cloud-->>Maint: 2-3 sentence summary
+        Maint-->>Rust: {summary, tags}
+        Rust->>Qdrant: Update metadata with summary
+        
+        and Breadcrumb Logging
+        Rust->>FS: Append to session_log.md
+    end
+    
+    Note over UI: User clicks on "summary.md" in file browser
+    
+    UI->>Rust: GET /file/summary.md
+    Rust->>FS: Read file
+    FS-->>Rust: Content
+    Rust-->>UI: {content, metadata, summary}
+    UI-->>User: Display in side panel
+    
+    Note over Rust,Cloud: Periodic: Workspace Health Check
+    
+    Rust->>Maint: POST /maintenance/analyze
+    Maint->>Maint: Analyze file structure,<br/>detect stale content
+    Maint->>Cloud: Claude API: Generate suggestions
+    Cloud-->>Maint: Reorganization ideas
+    Maint-->>Rust: {suggestions, health_score}
+    Rust->>UI: Notification badge
+    UI-->>User: "💡 3 new suggestions"

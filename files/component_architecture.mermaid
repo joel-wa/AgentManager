@@ -1,0 +1,144 @@
+graph TB
+    subgraph "Tauri Application Bundle"
+        subgraph "Frontend - React/TypeScript"
+            App[App.tsx<br/>Main Application]
+            ChatComp[ChatInterface.tsx<br/>Message handling]
+            FileComp[FileBrowser.tsx<br/>Tree view]
+            TimeComp[Timeline.tsx<br/>Session history]
+            InsightComp[Insights.tsx<br/>Suggestions panel]
+            
+            App --> ChatComp
+            App --> FileComp
+            App --> TimeComp
+            App --> InsightComp
+        end
+        
+        subgraph "Rust Backend - Tauri Core"
+            Main[main.rs<br/>Application entry]
+            
+            subgraph "Core Modules"
+                WS[websocket.rs<br/>Real-time comms]
+                API[api.rs<br/>REST endpoints]
+                Workspace[workspace.rs<br/>Project management]
+                FileOps[file_ops.rs<br/>FS operations]
+                Watcher[watcher.rs<br/>File change events]
+                Vector[vector.rs<br/>Qdrant client]
+                Session[session.rs<br/>Logging & state]
+            end
+            
+            subgraph "Agent Coordination"
+                Coord[coordinator.rs<br/>Orchestrates agents]
+                Tools[tools.rs<br/>Tool execution]
+                Cache[cache.rs<br/>Recent files cache]
+            end
+            
+            subgraph "Python Bridge"
+                Sidecar[sidecar.rs<br/>Launch Python services]
+                HTTP[http_client.rs<br/>Service communication]
+                Health[health.rs<br/>Service monitoring]
+            end
+            
+            Main --> WS
+            Main --> API
+            Main --> Sidecar
+            
+            WS --> Coord
+            API --> FileOps
+            API --> Workspace
+            
+            Coord --> Tools
+            Coord --> HTTP
+            Tools --> FileOps
+            Tools --> Vector
+            Tools --> Cache
+            
+            Watcher --> Session
+            Watcher --> HTTP
+            
+            Sidecar --> Health
+            Health --> HTTP
+        end
+    end
+    
+    subgraph "Python Microservices"
+        subgraph "main_agent/"
+            MA_Main[main.py<br/>FastAPI app]
+            MA_Ollama[ollama_client.py<br/>Chat & tools]
+            MA_Tools[tool_logic.py<br/>Function defs]
+            MA_Context[context_manager.py<br/>History handling]
+            
+            MA_Main --> MA_Ollama
+            MA_Main --> MA_Tools
+            MA_Ollama --> MA_Context
+        end
+        
+        subgraph "maintenance_agent/"
+            MM_Main[main.py<br/>FastAPI app]
+            MM_Cloud[cloud_client.py<br/>API integrations]
+            MM_Analyze[analyzer.py<br/>Workspace logic]
+            MM_Summary[summarizer.py<br/>Content processing]
+            
+            MM_Main --> MM_Cloud
+            MM_Main --> MM_Analyze
+            MM_Main --> MM_Summary
+        end
+        
+        subgraph "embeddings/"
+            EM_Main[main.py<br/>FastAPI app]
+            EM_Model[model.py<br/>Sentence transformers]
+            EM_Chunk[chunker.py<br/>Text splitting]
+            
+            EM_Main --> EM_Model
+            EM_Main --> EM_Chunk
+        end
+    end
+    
+    subgraph "Data Layer"
+        subgraph "Vector Database"
+            QD[Qdrant<br/>:6334]
+            Coll1[Collection: project_1]
+            Coll2[Collection: project_2]
+            
+            QD --> Coll1
+            QD --> Coll2
+        end
+        
+        subgraph "File Storage"
+            Root[~/.agent-workspace/]
+            Proj1[projects/project_1/<br/>├── files/<br/>├── .meta/<br/>└── session_log.md]
+            Proj2[projects/project_2/]
+            Global[global/<br/>├── config.json<br/>└── templates/]
+            
+            Root --> Proj1
+            Root --> Proj2
+            Root --> Global
+        end
+    end
+    
+    %% Connections between layers
+    ChatComp -.->|WebSocket| WS
+    FileComp -.->|REST| API
+    TimeComp -.->|REST| API
+    InsightComp -.->|REST| API
+    
+    HTTP -.->|POST /agent/chat| MA_Main
+    HTTP -.->|POST /maintenance/*| MM_Main
+    HTTP -.->|POST /embed| EM_Main
+    
+    Vector -.->|gRPC| QD
+    FileOps -.->|OS calls| Root
+    Watcher -.->|notify events| Root
+    
+    MA_Ollama -.->|HTTP| Ollama_Ext[Ollama :11434]
+    MM_Cloud -.->|HTTPS| Cloud_Ext[Claude/GPT APIs]
+    
+    %% Styling
+    classDef frontend fill:#e1f5ff,stroke:#01579b
+    classDef rustCore fill:#ffe0b2,stroke:#e65100
+    classDef pythonService fill:#f3e5f5,stroke:#4a148c
+    classDef data fill:#e8f5e9,stroke:#1b5e20
+    
+    class App,ChatComp,FileComp,TimeComp,InsightComp frontend
+    class Main,WS,API,Workspace,FileOps,Watcher,Vector,Session,Coord,Tools,Cache,Sidecar,HTTP,Health rustCore
+    class MA_Main,MA_Ollama,MA_Tools,MA_Context,MM_Main,MM_Cloud,MM_Analyze,MM_Summary,EM_Main,EM_Model,EM_Chunk pythonService
+    class QD,Coll1,Coll2,Root,Proj1,Proj2,Global data

@@ -1,0 +1,111 @@
+graph TB
+    subgraph "Frontend Layer"
+        UI[React/Tauri UI<br/>TypeScript]
+        Chat[Chat Interface]
+        Files[File Browser]
+        Timeline[Timeline View]
+        Insights[Maintenance Insights]
+        
+        UI --> Chat
+        UI --> Files
+        UI --> Timeline
+        UI --> Insights
+    end
+
+    subgraph "Rust Core Engine"
+        WS[WebSocket Server<br/>Axum]
+        FSM[File System Manager<br/>tokio::fs + notify]
+        PM[Project Manager<br/>Create/Switch/Load]
+        VDB[Vector DB Client<br/>Qdrant]
+        SL[Session Logger<br/>Breadcrumb Trail]
+        TC[Tool Coordinator<br/>Executes Tool Calls]
+        
+        WS --> TC
+        TC --> FSM
+        TC --> PM
+        TC --> VDB
+        TC --> SL
+    end
+
+    subgraph "Python Services"
+        subgraph "Main Agent Service :8001"
+            MA[FastAPI Server]
+            OC[Ollama Client<br/>Local Gemma]
+            TL[Tool Logic<br/>Function Calling]
+            
+            MA --> OC
+            MA --> TL
+        end
+        
+        subgraph "Maintenance Agent :8002"
+            MM[FastAPI Server]
+            CA[Cloud API Client<br/>Claude/GPT-4]
+            SA[Summary Generator]
+            WA[Workspace Analyzer]
+            
+            MM --> CA
+            MM --> SA
+            MM --> WA
+        end
+        
+        subgraph "Embedding Service :8003"
+            EM[FastAPI Server]
+            ET[Embedding Model<br/>sentence-transformers]
+            CE[Chunk Extractor]
+            
+            EM --> ET
+            EM --> CE
+        end
+    end
+
+    subgraph "External Services"
+        Ollama[Ollama Server<br/>:11434<br/>Local Gemma Model]
+        Qdrant[Qdrant Vector DB<br/>:6334]
+        CloudAPI[Cloud APIs<br/>Anthropic/OpenAI]
+    end
+
+    subgraph "File System"
+        WD[Workspace Directory<br/>~/.agent-workspace/]
+        P1[Project 1/<br/>files, notes, code]
+        P2[Project 2/<br/>files, notes, code]
+        Config[config.json<br/>settings]
+        
+        WD --> P1
+        WD --> P2
+        WD --> Config
+    end
+
+    %% Frontend to Rust connections
+    UI -->|WebSocket| WS
+    UI -->|REST API| WS
+
+    %% Rust to Python connections
+    TC -->|HTTP POST<br/>/agent/chat| MA
+    TC -->|HTTP POST<br/>/maintenance/*| MM
+    TC -->|HTTP POST<br/>/embed| EM
+    SL -->|HTTP POST<br/>/maintenance/analyze| MM
+
+    %% Python to External Services
+    OC -->|HTTP| Ollama
+    CA -->|HTTPS| CloudAPI
+    ET -.->|optional| Ollama
+
+    %% Rust to External Services
+    VDB -->|gRPC| Qdrant
+
+    %% Rust to File System
+    FSM -->|read/write/watch| WD
+    PM -->|create/load| WD
+
+    %% Data flow annotations
+    classDef frontend fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef rust fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    classDef python fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef external fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef storage fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+
+    class UI,Chat,Files,Timeline,Insights frontend
+    class WS,FSM,PM,VDB,SL,TC rust
+    class MA,OC,TL,MM,CA,SA,WA,EM,ET,CE python
+    class Ollama,Qdrant,CloudAPI external
+    class WD,P1,P2,Config storage

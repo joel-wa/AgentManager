@@ -1,0 +1,123 @@
+sequenceDiagram
+    participant User
+    participant Tauri as Tauri App
+    participant Rust as Rust Core
+    participant PS as Python Sidecar Manager
+    participant MA as Main Agent :8001
+    participant MM as Maintenance :8002
+    participant EM as Embeddings :8003
+    participant Qdrant as Qdrant DB
+    participant Ollama as Ollama
+    participant FS as File System
+
+    User->>Tauri: Launch application
+    activate Tauri
+    
+    Tauri->>Rust: Initialize core
+    activate Rust
+    
+    Note over Rust: Check dependencies
+    
+    Rust->>Qdrant: Health check :6334
+    alt Qdrant not running
+        Qdrant-->>Rust: Connection refused
+        Rust->>Rust: Start embedded Qdrant<br/>or show error
+    else Qdrant running
+        Qdrant-->>Rust: OK
+    end
+    
+    Rust->>Ollama: Health check :11434
+    alt Ollama not running
+        Ollama-->>Rust: Connection refused
+        Rust->>User: Error: "Ollama not detected"<br/>Show install instructions
+    else Ollama running
+        Ollama-->>Rust: OK
+        Rust->>Ollama: Check for Gemma model
+        alt Gemma not installed
+            Rust->>User: "Downloading Gemma..."
+            Ollama->>Ollama: Pull model
+        end
+    end
+    
+    Note over Rust,EM: Start Python services
+    
+    Rust->>PS: Spawn Python services
+    activate PS
+    
+    par Service Startup
+        PS->>MA: python main_agent/main.py<br/>--port 8001
+        activate MA
+        MA->>MA: Load FastAPI app
+        MA->>Ollama: Test connection
+        MA-->>PS: Ready
+        
+    and
+        PS->>MM: python maintenance_agent/main.py<br/>--port 8002
+        activate MM
+        MM->>MM: Load FastAPI app
+        MM->>MM: Initialize cloud clients
+        MM-->>PS: Ready
+        
+    and
+        PS->>EM: python embeddings/main.py<br/>--port 8003
+        activate EM
+        EM->>EM: Load FastAPI app
+        EM->>EM: Load embedding model<br/>(~500MB download if first run)
+        EM-->>PS: Ready
+    end
+    
+    PS-->>Rust: All services ready
+    deactivate PS
+    
+    Note over Rust: Initialize workspace
+    
+    Rust->>FS: Check ~/.agent-workspace/
+    alt First run
+        Rust->>FS: Create directory structure
+        Rust->>FS: Create default config
+        Rust->>Qdrant: Create default collections
+    else Existing workspace
+        Rust->>FS: Load config
+        Rust->>FS: Load last project
+        Rust->>Qdrant: Verify collections exist
+    end
+    
+    Rust->>Rust: Start file watcher
+    Rust->>Rust: Start WebSocket server
+    Rust->>Rust: Start REST API server
+    
+    Rust-->>Tauri: Core ready
+    deactivate Rust
+    
+    Tauri->>Tauri: Load React UI
+    Tauri->>Tauri: Connect WebSocket
+    Tauri-->>User: Show main window
+    deactivate Tauri
+    
+    Note over User,FS: System ready for use
+    
+    User->>Tauri: Close application
+    
+    Tauri->>Rust: Shutdown signal
+    activate Rust
+    
+    Rust->>MA: POST /shutdown
+    MA->>MA: Cleanup
+    deactivate MA
+    
+    Rust->>MM: POST /shutdown
+    MM->>MM: Cleanup
+    deactivate MM
+    
+    Rust->>EM: POST /shutdown
+    EM->>EM: Cleanup
+    deactivate EM
+    
+    Rust->>Rust: Save session state
+    Rust->>FS: Write final breadcrumb
+    Rust->>Qdrant: Close connection
+    
+    Rust-->>Tauri: Shutdown complete
+    deactivate Rust
+    
+    Tauri-->>User: Application closed
