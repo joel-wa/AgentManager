@@ -12,10 +12,11 @@ type Props = {
   workspaceHealth: 'good' | 'warning' | 'critical'
   onNewProject: () => void
   onProjectChange: (project: Project) => void
+  onSettingsClick?: () => void
   suggestionCount: number
 }
 
-export function TopBar({ project, workspaceHealth, onNewProject, suggestionCount }: Props) {
+export function TopBar({ project, workspaceHealth, onNewProject, suggestionCount, onSettingsClick }: Props) {
   const getHealthColor = () => {
     switch (workspaceHealth) {
       case 'good': return 'text-green-500'
@@ -78,7 +79,10 @@ export function TopBar({ project, workspaceHealth, onNewProject, suggestionCount
         </div>
         
         {/* Settings */}
-        <button className="p-2 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors">
+        <button 
+          onClick={onSettingsClick}
+          className="p-2 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors"
+        >
           <Settings className="w-5 h-5" />
         </button>
       </div>

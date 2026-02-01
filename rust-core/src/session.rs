@@ -35,6 +35,12 @@ impl SessionLogger {
         }
     }
 
+    /// Log a chat message interaction
+    pub fn log_message(&self, _project_id: &str, _user_message: &str, _response: &str) {
+        // TODO: Implement proper logging to timeline
+        tracing::debug!("Chat message logged for project");
+    }
+
     /// Get recent entries
     pub fn get_recent(&self, count: usize) -> Vec<&TimelineEntry> {
         self.entries.iter().take(count).collect()

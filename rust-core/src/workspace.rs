@@ -141,22 +141,24 @@ impl WorkspaceManager {
                 if entry_path.is_dir() {
                     let children = self.scan_directory(&entry_path, depth + 1)?;
                     items.push(FileItem {
-                        name,
+                        name: name.clone(),
                         file_type: FileType::Folder,
                         extension: None,
                         children: Some(children),
                         summary: None,
+                        path: Some(entry_path.to_string_lossy().to_string()),
                     });
                 } else {
                     let extension = entry_path
                         .extension()
                         .map(|e| e.to_string_lossy().to_string());
                     items.push(FileItem {
-                        name,
+                        name: name.clone(),
                         file_type: FileType::File,
                         extension,
                         children: None,
                         summary: None,
+                        path: Some(entry_path.to_string_lossy().to_string()),
                     });
                 }
             }

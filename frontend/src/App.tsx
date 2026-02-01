@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChatInterface } from './components/ChatInterface'
-import { FileBrowser } from './components/FileBrowser'
+import { FileBrowser, FileItem } from './components/FileBrowser'
 import { Timeline } from './components/Timeline'
 import { Insights } from './components/Insights'
 import { TopBar } from './components/TopBar'
 import { NewProjectModal } from './components/NewProjectModal'
+import { FileViewer } from './components/FileViewer'
+import { SettingsModal } from './components/SettingsModal'
+import { api } from './services/api'
 import { 
   FolderTree, 
   Clock, 
@@ -30,7 +33,7 @@ export type Message = {
 }
 
 export type ToolActivity = {
-  type: 'search' | 'read' | 'write'
+  type: 'search' | 'read' | 'write' | 'execute'
   description: string
   filePath?: string
   timestamp: Date
@@ -75,7 +78,17 @@ function App() {
   const [sidePanel, setSidePanel] = useState<SidePanel>('files')
   const [showSidePanel, setShowSidePanel] = useState(true)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
-  const [workspaceHealth] = useState<'good' | 'warning' | 'critical'>('good')
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [workspaceHealth, setWorkspaceHealth] = useState<'good' | 'warning' | 'critical'>('good')
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // File viewer state
+  const [viewingFile, setViewingFile] = useState<{
+    path: string
+    name: string
+    content: string
+  } | null>(null)
+  const [fileLoading, setFileLoading] = useState(false)
   
   const [suggestions] = useState<Suggestion[]>([
     {
@@ -114,7 +127,27 @@ function App() {
     }
   ])
 
-  const handleSendMessage = (content: string) => {
+  // Check backend health on mount
+  useEffect(() => {
+    checkHealth()
+  }, [])
+
+  const checkHealth = async () => {
+    try {
+      const health = await api.checkHealth()
+      if (health.services.rust_core && health.services.main_agent) {
+        setWorkspaceHealth('good')
+      } else if (health.services.rust_core) {
+        setWorkspaceHealth('warning')
+      } else {
+        setWorkspaceHealth('critical')
+      }
+    } catch {
+      setWorkspaceHealth('critical')
+    }
+  }
+
+  const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -123,33 +156,72 @@ function App() {
     }
     
     setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
     
-    // Simulate AI response with tool activity
-    setTimeout(() => {
+    try {
+      // Try to send to backend
+      const response = await api.sendMessage({
+        message: content,
+        context: currentProject?.description,
+        tools: ['search', 'read_file', 'write_file', 'execute_command'],
+        project_id: currentProject?.id
+      })
+      
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: response.message_id,
         role: 'assistant',
-        content: 'I\'ve searched through your workspace and found relevant information. Let me summarize the key points for you...\n\nBased on your notes, here are the main topics:\n\n1. **Authentication Patterns** - OAuth 2.0, JWT tokens\n2. **API Design** - RESTful principles, versioning strategies\n3. **Database Schema** - User models, session management',
+        content: response.response,
         timestamp: new Date(),
-        toolActivity: [
-          { type: 'search', description: 'Searched workspace for relevant content', timestamp: new Date() },
-          { type: 'read', description: 'Read auth/strategy.md', filePath: 'auth/strategy.md', timestamp: new Date() },
-          { type: 'write', description: 'Created notes/session_summary.md', filePath: 'notes/session_summary.md', timestamp: new Date() }
-        ]
+        toolActivity: response.tool_calls?.map(tc => ({
+          type: tc.name as 'search' | 'read' | 'write' | 'execute',
+          description: `${tc.name}: ${JSON.stringify(tc.arguments)}`,
+          timestamp: new Date()
+        }))
       }
       setMessages(prev => [...prev, assistantMessage])
-    }, 1500)
+    } catch {
+      // Fallback to simulated response
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'I\'ve searched through your workspace and found relevant information. Let me summarize the key points for you...\n\nBased on your notes, here are the main topics:\n\n1. **Authentication Patterns** - OAuth 2.0, JWT tokens\n2. **API Design** - RESTful principles, versioning strategies\n3. **Database Schema** - User models, session management',
+          timestamp: new Date(),
+          toolActivity: [
+            { type: 'search', description: 'Searched workspace for relevant content', timestamp: new Date() },
+            { type: 'read', description: 'Read auth/strategy.md', filePath: 'auth/strategy.md', timestamp: new Date() },
+            { type: 'write', description: 'Created notes/session_summary.md', filePath: 'notes/session_summary.md', timestamp: new Date() }
+          ]
+        }
+        setMessages(prev => [...prev, assistantMessage])
+      }, 1500)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleCreateProject = (name: string, description: string) => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name,
-      description,
-      createdAt: new Date(),
-      lastAccessed: new Date()
+  const handleCreateProject = async (name: string, description: string) => {
+    try {
+      const project = await api.createProject(name, description)
+      setCurrentProject({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        createdAt: new Date(project.created_at),
+        lastAccessed: new Date(project.last_accessed)
+      })
+    } catch {
+      // Fallback to local creation
+      const newProject: Project = {
+        id: Date.now().toString(),
+        name,
+        description,
+        createdAt: new Date(),
+        lastAccessed: new Date()
+      }
+      setCurrentProject(newProject)
     }
-    setCurrentProject(newProject)
+    
     setShowNewProjectModal(false)
     setMessages([{
       id: '1',
@@ -157,6 +229,40 @@ function App() {
       content: `Welcome to your new project "${name}"! I'm ready to help you organize and explore your workspace. What would you like to start with?`,
       timestamp: new Date()
     }])
+  }
+
+  const handleFileSelect = async (file: FileItem, fullPath: string) => {
+    if (file.type !== 'file') return
+    
+    setFileLoading(true)
+    try {
+      const content = await api.getFileContent(currentProject?.id || '1', fullPath)
+      setViewingFile({
+        path: fullPath,
+        name: file.name,
+        content
+      })
+    } catch {
+      // Show empty file viewer with mock content
+      setViewingFile({
+        path: fullPath,
+        name: file.name,
+        content: `# ${file.name}\n\nFile content would be loaded from the workspace.\n\nPath: ${fullPath}`
+      })
+    } finally {
+      setFileLoading(false)
+    }
+  }
+
+  const handleFileSave = async (content: string) => {
+    if (!viewingFile || !currentProject) return
+    
+    try {
+      await api.writeFile(currentProject.id, viewingFile.path, content)
+      setViewingFile({ ...viewingFile, content })
+    } catch (error) {
+      console.error('Failed to save file:', error)
+    }
   }
 
   const sidePanelTabs = [
@@ -172,6 +278,7 @@ function App() {
         workspaceHealth={workspaceHealth}
         onNewProject={() => setShowNewProjectModal(true)}
         onProjectChange={setCurrentProject}
+        onSettingsClick={() => setShowSettingsModal(true)}
         suggestionCount={suggestions.length}
       />
       
@@ -181,6 +288,7 @@ function App() {
           <ChatInterface 
             messages={messages}
             onSendMessage={handleSendMessage}
+            isLoading={isLoading}
           />
         </div>
         
@@ -225,7 +333,12 @@ function App() {
             
             {/* Panel Content */}
             <div className="flex-1 overflow-auto">
-              {sidePanel === 'files' && <FileBrowser />}
+              {sidePanel === 'files' && (
+                <FileBrowser 
+                  projectId={currentProject?.id}
+                  onFileSelect={handleFileSelect}
+                />
+              )}
               {sidePanel === 'timeline' && <Timeline entries={timeline} />}
               {sidePanel === 'insights' && <Insights suggestions={suggestions} />}
             </div>
@@ -237,6 +350,23 @@ function App() {
         <NewProjectModal 
           onClose={() => setShowNewProjectModal(false)}
           onCreate={handleCreateProject}
+        />
+      )}
+      
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+      
+      {viewingFile && (
+        <FileViewer
+          filePath={viewingFile.path}
+          fileName={viewingFile.name}
+          content={viewingFile.content}
+          isLoading={fileLoading}
+          onClose={() => setViewingFile(null)}
+          onSave={handleFileSave}
         />
       )}
     </div>

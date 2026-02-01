@@ -11,18 +11,107 @@ use uuid::Uuid;
 use crate::models::*;
 use crate::AppState;
 
-/// Health check endpoint
+const AGENT_SERVICE_URL: &str = "http://localhost:8001";
+const MAINTENANCE_SERVICE_URL: &str = "http://localhost:8002";
+const EMBEDDINGS_SERVICE_URL: &str = "http://localhost:8003";
+
+/// Health check endpoint - checks all services
 pub async fn health_check() -> Json<HealthResponse> {
+    let client = reqwest::Client::new();
+    
+    // Check Python services availability
+    let main_agent = client.get(&format!("{}/health", AGENT_SERVICE_URL))
+        .send().await.map(|r| r.status().is_success()).unwrap_or(false);
+    
+    let maintenance_agent = client.get(&format!("{}/health", MAINTENANCE_SERVICE_URL))
+        .send().await.map(|r| r.status().is_success()).unwrap_or(false);
+    
+    let embeddings = client.get(&format!("{}/health", EMBEDDINGS_SERVICE_URL))
+        .send().await.map(|r| r.status().is_success()).unwrap_or(false);
+    
     Json(HealthResponse {
         status: "ok".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         services: ServiceStatus {
             rust_core: true,
-            main_agent: false,
-            maintenance_agent: false,
-            embeddings: false,
+            main_agent,
+            maintenance_agent,
+            embeddings,
         },
     })
+}
+
+/// Chat endpoint - proxies to Python agent service
+pub async fn chat(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Json(request): Json<ChatRequest>,
+) -> Result<Json<ChatResponse>, StatusCode> {
+    let client = reqwest::Client::new();
+    
+    // Forward request to Python agent service
+    let agent_request = AgentChatRequest {
+        message: request.message.clone(),
+        context: request.context.clone(),
+        tools: request.tools.clone(),
+    };
+    
+    match client
+        .post(&format!("{}/agent/chat", AGENT_SERVICE_URL))
+        .json(&agent_request)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if response.status().is_success() {
+                match response.json::<AgentChatResponse>().await {
+                    Ok(agent_response) => {
+                        // Log the interaction
+                        let state = state.read().await;
+                        if let Some(project_id) = &request.project_id {
+                            state.session.log_message(project_id, &request.message, &agent_response.response);
+                        }
+                        
+                        Ok(Json(ChatResponse {
+                            response: agent_response.response,
+                            tool_calls: agent_response.tool_calls,
+                            message_id: agent_response.message_id,
+                        }))
+                    }
+                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                }
+            } else {
+                // Agent service returned an error
+                Err(StatusCode::BAD_GATEWAY)
+            }
+        }
+        Err(_) => {
+            // Agent service not available - return a fallback response
+            Ok(Json(ChatResponse {
+                response: "I'm sorry, but I'm currently unable to process your request. The AI agent service is not available. Please ensure Ollama is running and try again.".to_string(),
+                tool_calls: None,
+                message_id: Uuid::new_v4().to_string(),
+            }))
+        }
+    }
+}
+
+/// Get settings
+pub async fn get_settings(
+    State(state): State<Arc<RwLock<AppState>>>,
+) -> Json<Settings> {
+    let state = state.read().await;
+    Json(state.settings.clone())
+}
+
+/// Update settings
+pub async fn update_settings(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Json(new_settings): Json<Settings>,
+) -> Result<Json<Settings>, StatusCode> {
+    let mut state = state.write().await;
+    state.settings = new_settings.clone();
+    // TODO: Persist settings to disk
+    Ok(Json(new_settings))
 }
 
 /// List all projects
@@ -143,4 +232,22 @@ pub async fn get_suggestions(
             ]),
         },
     ])
+}
+
+/// Accept a suggestion
+pub async fn accept_suggestion(
+    Path((_project_id, suggestion_id)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    // TODO: Implement suggestion acceptance via maintenance service
+    tracing::info!("Accepting suggestion: {}", suggestion_id);
+    Ok(StatusCode::OK)
+}
+
+/// Dismiss a suggestion
+pub async fn dismiss_suggestion(
+    Path((_project_id, suggestion_id)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    // TODO: Implement suggestion dismissal
+    tracing::info!("Dismissing suggestion: {}", suggestion_id);
+    Ok(StatusCode::OK)
 }

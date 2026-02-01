@@ -1,15 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool } from 'lucide-react'
+import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool, Terminal } from 'lucide-react'
 import type { Message, ToolActivity } from '../App'
 
 type Props = {
   messages: Message[]
   onSendMessage: (content: string) => void
+  isLoading?: boolean
 }
 
-export function ChatInterface({ messages, onSendMessage }: Props) {
+export function ChatInterface({ messages, onSendMessage, isLoading = false }: Props) {
   const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -26,11 +26,9 @@ export function ChatInterface({ messages, onSendMessage }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (input.trim()) {
+    if (input.trim() && !isLoading) {
       onSendMessage(input.trim())
       setInput('')
-      setIsTyping(true)
-      setTimeout(() => setIsTyping(false), 1500)
     }
   }
 
@@ -49,7 +47,7 @@ export function ChatInterface({ messages, onSendMessage }: Props) {
           <MessageBubble key={message.id} message={message} />
         ))}
         
-        {isTyping && (
+        {isLoading && (
           <div className="flex items-start gap-3 animate-fade-in">
             <div className="w-8 h-8 rounded-full bg-accent-green flex items-center justify-center text-white text-sm font-medium">
               AI
@@ -89,12 +87,13 @@ export function ChatInterface({ messages, onSendMessage }: Props) {
                 text-white placeholder-gray-500 resize-none focus:outline-none focus:border-accent-blue
                 transition-colors"
               rows={1}
+              disabled={isLoading}
             />
           </div>
           
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
             className="p-3 bg-accent-blue text-white rounded-lg hover:bg-blue-600 
               disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -119,6 +118,7 @@ function MessageBubble({ message }: { message: Message }) {
       case 'search': return <Search className="w-3 h-3 text-accent-blue" />
       case 'read': return <FileText className="w-3 h-3 text-accent-green" />
       case 'write': return <PenTool className="w-3 h-3 text-accent-orange" />
+      case 'execute': return <Terminal className="w-3 h-3 text-accent-purple" />
     }
   }
   

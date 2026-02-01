@@ -61,6 +61,7 @@ pub enum ToolType {
     Search,
     Read,
     Write,
+    Execute,
 }
 
 /// Timeline entry
@@ -110,6 +111,8 @@ pub struct FileItem {
     pub children: Option<Vec<FileItem>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,7 +132,25 @@ pub enum WsMessage {
     Error { message: String },
 }
 
-/// Agent chat request
+/// Chat request from frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatRequest {
+    pub message: String,
+    pub context: Option<String>,
+    pub tools: Vec<String>,
+    pub project_id: Option<String>,
+}
+
+/// Chat response to frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatResponse {
+    pub response: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    pub message_id: String,
+}
+
+/// Agent chat request (to Python service)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentChatRequest {
     pub message: String,
@@ -137,12 +158,13 @@ pub struct AgentChatRequest {
     pub tools: Vec<String>,
 }
 
-/// Agent chat response
+/// Agent chat response (from Python service)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentChatResponse {
     pub response: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
+    pub message_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,4 +187,36 @@ pub struct ServiceStatus {
     pub main_agent: bool,
     pub maintenance_agent: bool,
     pub embeddings: bool,
+}
+
+/// Application settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    pub workspace_root: String,
+    pub ollama_url: String,
+    pub ollama_model: String,
+    pub theme: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            workspace_root: default_workspace_root(),
+            ollama_url: "http://localhost:11434".to_string(),
+            ollama_model: "gemma:7b".to_string(),
+            theme: "dark".to_string(),
+        }
+    }
+}
+
+fn default_workspace_root() -> String {
+    if cfg!(windows) {
+        dirs::home_dir()
+            .map(|h| h.join(".agent-workspace").to_string_lossy().to_string())
+            .unwrap_or_else(|| "C:\\Users\\.agent-workspace".to_string())
+    } else {
+        dirs::home_dir()
+            .map(|h| h.join(".agent-workspace").to_string_lossy().to_string())
+            .unwrap_or_else(|| "~/.agent-workspace".to_string())
+    }
 }
