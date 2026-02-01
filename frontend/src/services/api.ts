@@ -221,11 +221,12 @@ class ApiService {
   }
 
   private getDefaultWorkspaceRoot(): string {
-    // Platform-specific default paths
+    // Platform-specific default paths (placeholder for display)
     if (typeof window !== 'undefined') {
       const userAgent = window.navigator.userAgent.toLowerCase();
       if (userAgent.includes('win')) {
-        return 'C:\\Users\\%USERNAME%\\.agent-workspace';
+        // Display placeholder - actual path resolved by Rust backend
+        return 'C:\\Users\\<username>\\.agent-workspace';
       }
     }
     return '~/.agent-workspace';

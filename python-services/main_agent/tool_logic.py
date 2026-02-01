@@ -11,6 +11,7 @@ import asyncio
 import subprocess
 import os
 import sys
+import time
 
 
 @dataclass
@@ -573,7 +574,6 @@ class ToolExecutor:
         arguments: Dict[str, Any]
     ) -> ToolResult:
         """Execute a tool with given arguments"""
-        import time
         start_time = time.time()
         
         tool = self.registry.get(tool_name)

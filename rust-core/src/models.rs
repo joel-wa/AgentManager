@@ -210,13 +210,13 @@ impl Default for Settings {
 }
 
 fn default_workspace_root() -> String {
-    if cfg!(windows) {
-        dirs::home_dir()
-            .map(|h| h.join(".agent-workspace").to_string_lossy().to_string())
-            .unwrap_or_else(|| "C:\\Users\\.agent-workspace".to_string())
-    } else {
-        dirs::home_dir()
-            .map(|h| h.join(".agent-workspace").to_string_lossy().to_string())
-            .unwrap_or_else(|| "~/.agent-workspace".to_string())
-    }
+    dirs::home_dir()
+        .map(|h| h.join(".agent-workspace").to_string_lossy().to_string())
+        .unwrap_or_else(|| {
+            if cfg!(windows) {
+                "C:\\Users\\.agent-workspace".to_string()
+            } else {
+                "~/.agent-workspace".to_string()
+            }
+        })
 }
