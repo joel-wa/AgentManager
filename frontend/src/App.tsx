@@ -179,12 +179,22 @@ function App() {
     setIsLoading(true)
     
     try {
+      // Prepare chat history (last 10 messages for context, excluding system messages)
+      const chatHistory = messages
+        .filter(m => m.role !== 'assistant' || m.content) // Exclude empty assistant messages
+        .slice(-10) // Last 10 messages
+        .map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+      
       // Try to send to backend
       const response = await api.sendMessage({
         message: content,
         context: currentProject?.description,
         tools: ['search', 'read_file', 'write_file', 'list_directory', 'execute_command', 'find_recents', 'create_directory', 'delete_file'],
-        project_id: currentProject?.id
+        project_id: currentProject?.id,
+        chat_history: chatHistory
       })
       
       const assistantMessage: Message = {
@@ -199,6 +209,13 @@ function App() {
         }))
       }
       setMessages(prev => [...prev, assistantMessage])
+      
+      // Check if we should trigger a summary (every 10 messages)
+      const totalMessages = messages.length + 2 // +2 for user and assistant messages we just added
+      if (totalMessages % 10 === 0 && currentProject) {
+        // Trigger maintenance agent to create a summary
+        triggerSummaryGeneration(currentProject.id, messages)
+      }
     } catch (error) {
       // Log the actual error for debugging
       console.error('Failed to send message to backend:', error)
@@ -214,6 +231,14 @@ function App() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const triggerSummaryGeneration = async (projectId: string, messageHistory: Message[]) => {
+    // This would call the maintenance agent to create a summary
+    // For now, we'll just log that a summary should be created
+    console.log('Summary should be generated for project:', projectId)
+    console.log('Message count:', messageHistory.length)
+    // TODO: Implement actual summary generation via maintenance agent
   }
 
   const handleCreateProject = async (name: string, description: string, location?: string) => {

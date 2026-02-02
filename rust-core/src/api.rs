@@ -2,11 +2,15 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     Json,
+    response::sse::{Event, Sse},
+    body::Body,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::Utc;
 use uuid::Uuid;
+use futures::stream::{Stream, StreamExt};
+use std::convert::Infallible;
 
 use crate::models::*;
 use crate::AppState;
@@ -61,6 +65,7 @@ pub async fn chat(
         tools: request.tools.clone(),
         project_id: request.project_id.clone(),
         workspace_root: Some(workspace_root),
+        chat_history: request.chat_history.clone(),
     };
     
     match client
@@ -108,6 +113,69 @@ pub async fn chat(
             }))
         }
     }
+}
+
+/// Chat streaming endpoint - proxies to Python agent service with SSE
+pub async fn chat_stream(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Json(request): Json<ChatRequest>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let workspace_root = {
+        let state = state.read().await;
+        state.settings.workspace_root.clone()
+    };
+    
+    // Forward request to Python agent service
+    let agent_request = AgentChatRequest {
+        message: request.message.clone(),
+        context: request.context.clone(),
+        tools: request.tools.clone(),
+        project_id: request.project_id.clone(),
+        workspace_root: Some(workspace_root),
+        chat_history: request.chat_history.clone(),
+    };
+    
+    let stream = async_stream::stream! {
+        let client = reqwest::Client::new();
+        
+        match client
+            .post(&format!("{}/agent/chat/stream", AGENT_SERVICE_URL))
+            .json(&agent_request)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let mut stream = response.bytes_stream();
+                
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(bytes) => {
+                            if let Ok(text) = String::from_utf8(bytes.to_vec()) {
+                                // Forward SSE events directly
+                                for line in text.lines() {
+                                    if line.starts_with("data: ") {
+                                        let data = &line[6..];
+                                        yield Ok(Event::default().data(data));
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Stream error: {}", e);
+                            yield Ok(Event::default().data(format!("{{\"type\":\"error\",\"message\":\"{}\"}}", e)));
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to connect to agent service: {}", e);
+                yield Ok(Event::default().data(format!("{{\"type\":\"error\",\"message\":\"Agent service unavailable: {}\"}}", e)));
+            }
+        }
+    };
+    
+    Sse::new(stream)
 }
 
 /// Get settings

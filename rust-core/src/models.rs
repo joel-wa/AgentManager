@@ -139,6 +139,15 @@ pub struct ChatRequest {
     pub context: Option<String>,
     pub tools: Vec<String>,
     pub project_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_history: Option<Vec<HistoryMessage>>,
+}
+
+/// Simple history message for context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryMessage {
+    pub role: String,
+    pub content: String,
 }
 
 /// Chat response to frontend
@@ -158,6 +167,8 @@ pub struct AgentChatRequest {
     pub tools: Vec<String>,
     pub project_id: Option<String>,
     pub workspace_root: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chat_history: Option<Vec<HistoryMessage>>,
 }
 
 /// Agent chat response (from Python service)

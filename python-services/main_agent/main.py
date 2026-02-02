@@ -5,6 +5,7 @@ Handles chat interactions with local Ollama models (Gemma)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
@@ -12,6 +13,7 @@ from datetime import datetime
 import uuid
 import json
 import os
+import asyncio
 
 from ollama_client import OllamaClient
 from tool_logic import ToolExecutor
@@ -43,6 +45,7 @@ class ChatRequest(BaseModel):
     tools: List[str] = []
     project_id: Optional[str] = None
     workspace_root: Optional[str] = None
+    chat_history: Optional[List[Dict[str, str]]] = None
 
 
 class ToolCall(BaseModel):
@@ -139,6 +142,12 @@ async def chat(request: ChatRequest):
                 "role": "system", 
                 "content": system_prompt
             })
+        
+        # Add chat history if provided (last N messages for context)
+        if request.chat_history:
+            # Limit to last 10 messages for context
+            recent_history = request.chat_history[-10:]
+            messages.extend(recent_history)
         
         messages.append({
             "role": "user",
@@ -271,6 +280,125 @@ async def chat(request: ChatRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """
+    Streaming version of chat endpoint that sends updates as they happen
+    Streams tool calls and responses in real-time using Server-Sent Events
+    """
+    async def event_generator():
+        try:
+            # Compute the project working directory
+            project_working_dir = None
+            if request.workspace_root and request.project_id:
+                project_working_dir = os.path.join(
+                    request.workspace_root, "projects", request.project_id
+                )
+                os.makedirs(project_working_dir, exist_ok=True)
+            elif request.workspace_root:
+                project_working_dir = request.workspace_root
+            
+            # Create project-specific tool executor
+            project_tool_executor = ToolExecutor(working_directory=project_working_dir)
+            
+            # Get full tool schemas
+            tool_schemas = project_tool_executor.get_tool_schemas() if request.tools else []
+            if request.tools:
+                tool_schemas = [t for t in tool_schemas if t["name"] in request.tools]
+            
+            # Load soul.md
+            soul_prompt = ""
+            if project_working_dir:
+                soul_path = os.path.join(project_working_dir, "soul.md")
+                if os.path.exists(soul_path):
+                    try:
+                        with open(soul_path, 'r', encoding='utf-8') as f:
+                            soul_prompt = f.read()
+                    except Exception as e:
+                        print(f"[SOUL] Error loading soul.md: {e}")
+            
+            # Build system prompt
+            system_prompt = build_system_prompt(tool_schemas, soul_prompt, project_working_dir)
+            
+            # Build initial messages
+            messages = []
+            if request.context:
+                messages.append({
+                    "role": "system",
+                    "content": f"{system_prompt}\n\nContext:\n{request.context}"
+                })
+            else:
+                messages.append({
+                    "role": "system", 
+                    "content": system_prompt
+                })
+            
+            # Add chat history
+            if request.chat_history:
+                recent_history = request.chat_history[-10:]
+                messages.extend(recent_history)
+            
+            messages.append({
+                "role": "user",
+                "content": request.message
+            })
+            
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Processing your request...'})}\n\n"
+            
+            # Agentic loop with streaming
+            max_iterations = 15
+            all_tool_calls = []
+            final_response = ""
+            
+            for iteration in range(max_iterations):
+                # Send iteration status
+                yield f"data: {json.dumps({'type': 'iteration', 'number': iteration + 1})}\n\n"
+                
+                # Get response from Ollama
+                response_text, tool_calls = await ollama_client.chat(messages, request.tools)
+                final_response = response_text
+                
+                # If no tool calls, send final response and finish
+                if not tool_calls:
+                    yield f"data: {json.dumps({'type': 'response', 'content': response_text})}\n\n"
+                    break
+                
+                # Send tool call notifications
+                for tc in tool_calls:
+                    yield f"data: {json.dumps({'type': 'tool_call', 'name': tc['name'], 'arguments': tc['arguments']})}\n\n"
+                    
+                    # Execute tool
+                    result = await project_tool_executor.execute(tc["name"], tc["arguments"])
+                    
+                    # Send tool result
+                    yield f"data: {json.dumps({'type': 'tool_result', 'name': tc['name'], 'success': result.success, 'preview': str(result.result)[:100]})}\n\n"
+                    
+                    all_tool_calls.append(ToolCall(name=tc["name"], arguments=tc["arguments"]))
+                
+                # Add assistant's response to conversation
+                messages.append({"role": "assistant", "content": response_text})
+                
+                # Add tool results
+                tool_results_text = "[TOOL RESULTS]\n"
+                for tc in tool_calls:
+                    result = await project_tool_executor.execute(tc["name"], tc["arguments"])
+                    if result.success:
+                        tool_results_text += f"\n{tc['name']}: {str(result.result)[:200]}\n"
+                    else:
+                        tool_results_text += f"\n{tc['name']}: ERROR: {result.error}\n"
+                
+                messages.append({"role": "user", "content": tool_results_text})
+            
+            # Send completion
+            yield f"data: {json.dumps({'type': 'done', 'message_id': str(uuid.uuid4()), 'tool_calls': len(all_tool_calls)})}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.post("/agent/complete")

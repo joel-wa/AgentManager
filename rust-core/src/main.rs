@@ -72,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
     let api_router = Router::new()
         .route("/health", get(api::health_check))
         .route("/chat", post(api::chat))
+        .route("/chat/stream", post(api::chat_stream))
         .route("/settings", get(api::get_settings))
         .route("/settings", put(api::update_settings))
         .route("/projects", get(api::list_projects))

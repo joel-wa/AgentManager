@@ -27,6 +27,7 @@ export interface ChatRequest {
   context?: string;
   tools: string[];
   project_id?: string;
+  chat_history?: Array<{ role: string; content: string }>;
 }
 
 export interface ToolCall {
