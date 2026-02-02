@@ -13,7 +13,7 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react'
-import { api, FileItem as ApiFileItem } from '../services/api'
+import { api } from '../services/api'
 
 export type FileItem = {
   name: string
@@ -29,49 +29,20 @@ type Props = {
   onFileSelect?: (file: FileItem, fullPath: string) => void
 }
 
-// Mock data for when backend is not available
-const mockFileTree: FileItem[] = [
-  {
-    name: 'auth',
-    type: 'folder',
-    path: 'auth',
-    children: [
-      { name: 'strategy.md', type: 'file', extension: 'md', summary: 'OAuth 2.0 implementation strategy', path: 'auth/strategy.md' },
-      { name: 'tokens.md', type: 'file', extension: 'md', summary: 'JWT token handling guide', path: 'auth/tokens.md' },
-    ]
-  },
-  {
-    name: 'notes',
-    type: 'folder',
-    path: 'notes',
-    children: [
-      { name: 'session_summary.md', type: 'file', extension: 'md', summary: 'Today\'s session notes', path: 'notes/session_summary.md' },
-      { name: 'research_topics.md', type: 'file', extension: 'md', path: 'notes/research_topics.md' },
-    ]
-  },
-  {
-    name: 'api',
-    type: 'folder',
-    path: 'api',
-    children: [
-      { name: 'endpoints.json', type: 'file', extension: 'json', path: 'api/endpoints.json' },
-      { name: 'schema.ts', type: 'file', extension: 'ts', path: 'api/schema.ts' },
-    ]
-  },
-  { name: 'README.md', type: 'file', extension: 'md', summary: 'Project overview and quick start', path: 'README.md' },
-  { name: 'config.json', type: 'file', extension: 'json', path: 'config.json' },
-]
-
 export function FileBrowser({ projectId, onFileSelect }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [fileTree, setFileTree] = useState<FileItem[]>(mockFileTree)
+  const [fileTree, setFileTree] = useState<FileItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
   useEffect(() => {
     if (projectId) {
       loadFiles()
+    } else {
+      setFileTree([])
+      setIsInitialized(true)
     }
   }, [projectId])
 
@@ -82,34 +53,17 @@ export function FileBrowser({ projectId, onFileSelect }: Props) {
     setError(null)
     try {
       const files = await api.listFiles(projectId)
-      if (files && files.length > 0) {
-        setFileTree(convertApiFiles(files))
-      } else {
-        // Empty project - clear mock data
-        setFileTree([])
-      }
+      setFileTree(files || [])
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Backend not available'
       console.error('Failed to load files:', errorMessage)
       setError(errorMessage)
-      // Keep mock data on error for demo purposes
+      // Show empty state on error - no mock data
+      setFileTree([])
     } finally {
       setIsLoading(false)
+      setIsInitialized(true)
     }
-  }
-
-  const convertApiFiles = (apiFiles: ApiFileItem[], parentPath: string = ''): FileItem[] => {
-    return apiFiles.map(file => {
-      const fullPath = parentPath ? `${parentPath}/${file.name}` : file.name
-      return {
-        name: file.name,
-        type: file.type,
-        extension: file.extension,
-        summary: file.summary,
-        path: fullPath,
-        children: file.children ? convertApiFiles(file.children, fullPath) : undefined
-      }
-    })
   }
 
   const handleFileClick = (item: FileItem) => {
@@ -177,7 +131,22 @@ export function FileBrowser({ projectId, onFileSelect }: Props) {
           </div>
         )}
         
-        {filterFiles(fileTree).map((item, idx) => (
+        {isLoading && (
+          <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
+            <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+            Loading files...
+          </div>
+        )}
+        
+        {!isLoading && isInitialized && fileTree.length === 0 && !error && (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-500 text-sm">
+            <Folder className="w-8 h-8 mb-2 opacity-50" />
+            <p>No files in this project</p>
+            <p className="text-xs mt-1">Create files using the chat or click + above</p>
+          </div>
+        )}
+        
+        {!isLoading && filterFiles(fileTree).map((item, idx) => (
           <FileTreeItem 
             key={idx} 
             item={item} 
