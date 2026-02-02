@@ -48,9 +48,18 @@ class ToolCall(BaseModel):
     arguments: Dict[str, Any]
 
 
+class ToolResult(BaseModel):
+    tool_name: str
+    success: bool
+    result: Any
+    error: Optional[str] = None
+    execution_time_ms: Optional[float] = None
+
+
 class ChatResponse(BaseModel):
     response: str
     tool_calls: Optional[List[ToolCall]] = None
+    tool_results: Optional[List[ToolResult]] = None
     message_id: str
 
 
@@ -75,6 +84,7 @@ async def health_check():
 async def chat(request: ChatRequest):
     """
     Process chat message with optional tool usage
+    Implements agentic loop: agent can see tool results and make follow-up decisions
     """
     try:
         # Get full tool schemas
@@ -87,7 +97,7 @@ async def chat(request: ChatRequest):
         # Build system prompt with tools
         system_prompt = build_system_prompt(tool_schemas)
         
-        # Build messages
+        # Build initial messages
         messages = []
         if request.context:
             messages.append({
@@ -105,12 +115,97 @@ async def chat(request: ChatRequest):
             "content": request.message
         })
         
-        # Get response from Ollama
-        response_text, tool_calls = await ollama_client.chat(messages, request.tools)
+        # Agentic loop: allow agent to see results and iterate
+        max_iterations = 5  # Prevent infinite loops
+        all_tool_calls = []
+        all_tool_results = []
+        final_response = ""
+        
+        print(f"\n[AGENTIC LOOP] Starting with max {max_iterations} iterations")
+        
+        for iteration in range(max_iterations):
+            print(f"\n[ITERATION {iteration + 1}] Calling LLM...")
+            
+            # Get response from Ollama
+            response_text, tool_calls = await ollama_client.chat(messages, request.tools)
+            final_response = response_text
+            
+            print(f"[ITERATION {iteration + 1}] Response length: {len(response_text)} chars")
+            print(f"[ITERATION {iteration + 1}] Tool calls detected: {len(tool_calls) if tool_calls else 0}")
+            
+            # If no tool calls, agent is done
+            if not tool_calls:
+                print(f"[ITERATION {iteration + 1}] No tool calls - agent is done!")
+                print(f"[ITERATION {iteration + 1}] Final response: {response_text[:200]}...")
+                break
+            
+            # Execute tools
+            print(f"[ITERATION {iteration + 1}] Executing {len(tool_calls)} tool(s)...")
+            iteration_results = []
+            for tc in tool_calls:
+                print(f"  - Executing: {tc['name']}({list(tc['arguments'].keys())})")
+                result = await tool_executor.execute(tc["name"], tc["arguments"])
+                tool_result = ToolResult(
+                    tool_name=tc["name"],
+                    success=result.success,
+                    result=result.result,
+                    error=result.error,
+                    execution_time_ms=result.execution_time_ms
+                )
+                iteration_results.append(tool_result)
+                all_tool_calls.append(ToolCall(name=tc["name"], arguments=tc["arguments"]))
+                all_tool_results.append(tool_result)
+                status = "✓" if result.success else "✗"
+                print(f"    {status} {tc['name']}: {result.success}")
+            
+            # Add assistant's response to conversation
+            messages.append({
+                "role": "assistant",
+                "content": response_text
+            })
+            
+            # Add tool results as a "user" message so agent can see them
+            tool_results_text = "[TOOL RESULTS]\n"
+            for tc, tr in zip(tool_calls, iteration_results):
+                tool_results_text += f"\n{tc['name']}({json.dumps(tc['arguments'], separators=(',', ':'))}): "
+                if tr.success:
+                    # Format result based on type
+                    if isinstance(tr.result, dict):
+                        if 'content' in tr.result:
+                            # File content - show preview
+                            content = str(tr.result['content'])[:300]
+                            tool_results_text += f"File read successfully.\nContent: {content}...\n"
+                        elif 'entries' in tr.result:
+                            # Directory listing
+                            entries = tr.result['entries']
+                            tool_results_text += f"Found {len(entries)} items.\n"
+                            if entries:
+                                tool_results_text += "Items: " + ", ".join([e.get('name', '?') for e in entries[:10]]) + "\n"
+                        else:
+                            # Generic result
+                            tool_results_text += json.dumps(tr.result, indent=2)[:200] + "\n"
+                    else:
+                        tool_results_text += f"{str(tr.result)[:200]}\n"
+                else:
+                    tool_results_text += f"ERROR: {tr.error}\n"
+            
+            tool_results_text += "\n[END TOOL RESULTS]\nNow provide your answer based on these results. If you need more information, you can call additional tools."
+            
+            messages.append({
+                "role": "user",
+                "content": tool_results_text
+            })
+            
+            print(f"[ITERATION {iteration + 1}] Added tool results to conversation. Continuing loop...")
+        
+        print(f"\n[AGENTIC LOOP] Completed. Total iterations: {iteration + 1}")
+        print(f"[AGENTIC LOOP] Total tool calls: {len(all_tool_calls)}")
+        print(f"[AGENTIC LOOP] Final response length: {len(final_response)} chars\n")
         
         return ChatResponse(
-            response=response_text,
-            tool_calls=[ToolCall(name=tc["name"], arguments=tc["arguments"]) for tc in tool_calls] if tool_calls else None,
+            response=final_response,
+            tool_calls=all_tool_calls if all_tool_calls else None,
+            tool_results=all_tool_results if all_tool_results else None,
             message_id=str(uuid.uuid4())
         )
         
@@ -147,18 +242,49 @@ async def list_tools():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/agent/execute-tool")
+async def execute_tool(tool_name: str, arguments: Dict[str, Any]):
+    """Execute a specific tool with given arguments"""
+    try:
+        result = await tool_executor.execute(tool_name, arguments)
+        return {
+            "success": result.success,
+            "result": result.result,
+            "error": result.error,
+            "execution_time_ms": result.execution_time_ms
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def build_system_prompt(tool_schemas: List[Dict[str, Any]]) -> str:
     """Build system prompt with available tools and usage instructions"""
     base_prompt = """You are a helpful AI workspace assistant. You help users organize their notes, research, and code files.
 You have access to a workspace where you can search, read, and write files.
-Always be helpful, concise, and accurate. When you need information from the workspace, use the available tools."""
+Always be helpful, concise, and accurate."""
 
     if tool_schemas:
         base_prompt += "\n\n# TOOL USAGE INSTRUCTIONS\n"
-        base_prompt += "To use a tool, respond with a JSON object in this EXACT format:\n"
-        base_prompt += "```json\n{\n  \"tool_calls\": [\n    {\n      \"name\": \"tool_name\",\n      \"arguments\": {\"arg1\": \"value1\", \"arg2\": \"value2\"}\n    }\n  ]\n}\n```\n\n"
-        base_prompt += "You can call multiple tools at once by adding more objects to the tool_calls array.\n"
-        base_prompt += "Always include the tool call in a code block with ```json markers.\n\n"
+        base_prompt += """When you need to use tools, respond ONLY with a JSON object in this EXACT format:
+```json
+{
+  "tool_calls": [
+    {
+      "name": "tool_name",
+      "arguments": {"arg1": "value1", "arg2": "value2"}
+    }
+  ]
+}
+```
+
+After seeing tool results, respond naturally with your answer. Do NOT use JSON format for your final response.
+You can call multiple tools at once by adding more objects to the tool_calls array.
+
+Workflow:
+1. If you need information -> Use tools (JSON format)
+2. After getting tool results -> Provide natural language answer
+3. If you need MORE information after seeing results -> Use more tools (JSON format)
+4. When you have enough information -> Give final answer (natural language)\n\n"""
         base_prompt += "# AVAILABLE TOOLS:\n\n"
         
         for tool in tool_schemas:

@@ -158,14 +158,58 @@ class ReadFileTool(BaseTool):
     
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
-        return ToolResult(
-            success=True,
-            result={
-                "path": path,
-                "content": None,
-                "status": "delegated_to_core"
-            }
-        )
+        if not path:
+            return ToolResult(
+                success=False,
+                result=None,
+                error="No path provided"
+            )
+        
+        try:
+            # Read file asynchronously
+            import aiofiles
+            async with aiofiles.open(path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+            
+            return ToolResult(
+                success=True,
+                result={
+                    "path": path,
+                    "content": content,
+                    "size_bytes": len(content.encode('utf-8'))
+                }
+            )
+        except FileNotFoundError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"File not found: {path}"
+            )
+        except PermissionError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Permission denied: {path}"
+            )
+        except Exception as e:
+            # Fallback to sync read if aiofiles not available
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return ToolResult(
+                    success=True,
+                    result={
+                        "path": path,
+                        "content": content,
+                        "size_bytes": len(content.encode('utf-8'))
+                    }
+                )
+            except Exception as e:
+                return ToolResult(
+                    success=False,
+                    result=None,
+                    error=str(e)
+                )
 
 
 class WriteFileTool(BaseTool):
@@ -207,14 +251,49 @@ class WriteFileTool(BaseTool):
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
         content = args.get("content", "")
-        return ToolResult(
-            success=True,
-            result={
-                "path": path,
-                "content_length": len(content),
-                "status": "delegated_to_core"
-            }
-        )
+        
+        if not path:
+            return ToolResult(
+                success=False,
+                result=None,
+                error="No path provided"
+            )
+        
+        try:
+            # Ensure parent directory exists
+            parent_dir = os.path.dirname(path)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
+            
+            # Write file (try async first, fallback to sync)
+            try:
+                import aiofiles
+                async with aiofiles.open(path, 'w', encoding='utf-8') as f:
+                    await f.write(content)
+            except:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            
+            return ToolResult(
+                success=True,
+                result={
+                    "path": path,
+                    "content_length": len(content),
+                    "bytes_written": len(content.encode('utf-8'))
+                }
+            )
+        except PermissionError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Permission denied: {path}"
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=str(e)
+            )
 
 
 class ListDirectoryTool(BaseTool):
@@ -253,15 +332,79 @@ class ListDirectoryTool(BaseTool):
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", ".")
         recursive = args.get("recursive", False)
-        return ToolResult(
-            success=True,
-            result={
-                "path": path,
-                "recursive": recursive,
-                "entries": [],
-                "status": "delegated_to_core"
-            }
-        )
+        
+        try:
+            if not os.path.exists(path):
+                return ToolResult(
+                    success=False,
+                    result=None,
+                    error=f"Path does not exist: {path}"
+                )
+            
+            entries = []
+            
+            if recursive:
+                # Recursive listing
+                for root, dirs, files in os.walk(path):
+                    for name in dirs:
+                        full_path = os.path.join(root, name)
+                        rel_path = os.path.relpath(full_path, path)
+                        entries.append({
+                            "name": rel_path,
+                            "type": "directory",
+                            "path": full_path
+                        })
+                    for name in files:
+                        full_path = os.path.join(root, name)
+                        rel_path = os.path.relpath(full_path, path)
+                        try:
+                            size = os.path.getsize(full_path)
+                        except:
+                            size = 0
+                        entries.append({
+                            "name": rel_path,
+                            "type": "file",
+                            "path": full_path,
+                            "size_bytes": size
+                        })
+            else:
+                # Non-recursive listing
+                for entry in os.listdir(path):
+                    full_path = os.path.join(path, entry)
+                    is_dir = os.path.isdir(full_path)
+                    entry_data = {
+                        "name": entry,
+                        "type": "directory" if is_dir else "file",
+                        "path": full_path
+                    }
+                    if not is_dir:
+                        try:
+                            entry_data["size_bytes"] = os.path.getsize(full_path)
+                        except:
+                            entry_data["size_bytes"] = 0
+                    entries.append(entry_data)
+            
+            return ToolResult(
+                success=True,
+                result={
+                    "path": path,
+                    "recursive": recursive,
+                    "entries": entries,
+                    "count": len(entries)
+                }
+            )
+        except PermissionError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Permission denied: {path}"
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=str(e)
+            )
 
 
 class ExecuteCommandTool(BaseTool):
@@ -451,13 +594,35 @@ class CreateDirectoryTool(BaseTool):
     
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
-        return ToolResult(
-            success=True,
-            result={
-                "path": path,
-                "status": "delegated_to_core"
-            }
-        )
+        
+        if not path:
+            return ToolResult(
+                success=False,
+                result=None,
+                error="No path provided"
+            )
+        
+        try:
+            os.makedirs(path, exist_ok=True)
+            return ToolResult(
+                success=True,
+                result={
+                    "path": path,
+                    "created": True
+                }
+            )
+        except PermissionError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Permission denied: {path}"
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=str(e)
+            )
 
 
 class DeleteFileTool(BaseTool):
@@ -494,13 +659,49 @@ class DeleteFileTool(BaseTool):
     
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
-        return ToolResult(
-            success=True,
-            result={
-                "path": path,
-                "status": "delegated_to_core"
-            }
-        )
+        
+        if not path:
+            return ToolResult(
+                success=False,
+                result=None,
+                error="No path provided"
+            )
+        
+        try:
+            if not os.path.exists(path):
+                return ToolResult(
+                    success=False,
+                    result=None,
+                    error=f"File does not exist: {path}"
+                )
+            
+            if os.path.isdir(path):
+                return ToolResult(
+                    success=False,
+                    result=None,
+                    error=f"Path is a directory, not a file: {path}"
+                )
+            
+            os.remove(path)
+            return ToolResult(
+                success=True,
+                result={
+                    "path": path,
+                    "deleted": True
+                }
+            )
+        except PermissionError:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Permission denied: {path}"
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=str(e)
+            )
 
 
 class ToolRegistry:
