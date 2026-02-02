@@ -148,7 +148,7 @@ pub async fn create_project(
     let state = state.read().await;
     let project = Project::new(payload.name, payload.description);
     
-    match state.workspace.create_project(&project) {
+    match state.workspace.create_project(&project, payload.location.as_deref()) {
         Ok(_) => Ok(Json(project)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
@@ -158,6 +158,7 @@ pub async fn create_project(
 pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
+    pub location: Option<String>,
 }
 
 /// Get project by ID

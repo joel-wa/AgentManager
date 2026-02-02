@@ -58,6 +58,7 @@ type SidePanel = 'files' | 'search' | 'timeline' | 'insights'
 
 function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
   
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -144,19 +145,22 @@ function App() {
 
   const loadProjects = async () => {
     try {
-      const projects = await api.listProjects()
-      if (projects.length > 0) {
+      const projectsData = await api.listProjects()
+      const projectsList = projectsData.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        createdAt: new Date(p.created_at),
+        lastAccessed: new Date(p.last_accessed)
+      }))
+      setProjects(projectsList)
+      
+      if (projectsList.length > 0) {
         // Auto-select the most recently accessed project
-        const sorted = projects.sort((a, b) => 
-          new Date(b.last_accessed).getTime() - new Date(a.last_accessed).getTime()
+        const sorted = [...projectsList].sort((a, b) => 
+          b.lastAccessed.getTime() - a.lastAccessed.getTime()
         )
-        setCurrentProject({
-          id: sorted[0].id,
-          name: sorted[0].name,
-          description: sorted[0].description,
-          createdAt: new Date(sorted[0].created_at),
-          lastAccessed: new Date(sorted[0].last_accessed)
-        })
+        setCurrentProject(sorted[0])
       }
     } catch (err) {
       console.error('Failed to load projects:', err)
@@ -212,16 +216,18 @@ function App() {
     }
   }
 
-  const handleCreateProject = async (name: string, description: string) => {
+  const handleCreateProject = async (name: string, description: string, location?: string) => {
     try {
-      const project = await api.createProject(name, description)
-      setCurrentProject({
+      const project = await api.createProject(name, description, location)
+      const newProject: Project = {
         id: project.id,
         name: project.name,
         description: project.description,
         createdAt: new Date(project.created_at),
         lastAccessed: new Date(project.last_accessed)
-      })
+      }
+      setProjects(prev => [...prev, newProject])
+      setCurrentProject(newProject)
     } catch {
       // Fallback to local creation
       const newProject: Project = {
@@ -231,6 +237,7 @@ function App() {
         createdAt: new Date(),
         lastAccessed: new Date()
       }
+      setProjects(prev => [...prev, newProject])
       setCurrentProject(newProject)
     }
     
@@ -239,6 +246,17 @@ function App() {
       id: '1',
       role: 'assistant',
       content: `Welcome to your new project "${name}"! I'm ready to help you organize and explore your workspace. What would you like to start with?`,
+      timestamp: new Date()
+    }])
+  }
+
+  const handleProjectChange = (project: Project) => {
+    setCurrentProject(project)
+    // Reset chat when switching projects
+    setMessages([{
+      id: '1',
+      role: 'assistant',
+      content: `Switched to project "${project.name}". How can I help you today?`,
       timestamp: new Date()
     }])
   }
@@ -287,9 +305,10 @@ function App() {
     <div className="h-screen flex flex-col bg-dark-bg">
       <TopBar 
         project={currentProject}
+        projects={projects}
         workspaceHealth={workspaceHealth}
         onNewProject={() => setShowNewProjectModal(true)}
-        onProjectChange={setCurrentProject}
+        onProjectChange={handleProjectChange}
         onSettingsClick={() => setShowSettingsModal(true)}
         suggestionCount={suggestions.length}
       />

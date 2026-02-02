@@ -1,19 +1,21 @@
 import { useState } from 'react'
-import { X, FolderPlus } from 'lucide-react'
+import { X, FolderPlus, Folder } from 'lucide-react'
 
 type Props = {
   onClose: () => void
-  onCreate: (name: string, description: string) => void
+  onCreate: (name: string, description: string, location?: string) => void
 }
 
 export function NewProjectModal({ onClose, onCreate }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [customLocation, setCustomLocation] = useState('')
+  const [useCustomLocation, setUseCustomLocation] = useState(false)
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim()) {
-      onCreate(name.trim(), description.trim())
+      onCreate(name.trim(), description.trim(), useCustomLocation ? customLocation.trim() : undefined)
     }
   }
 
@@ -65,6 +67,36 @@ export function NewProjectModal({ onClose, onCreate }: Props) {
               className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2.5
                 text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue transition-colors resize-none"
             />
+          </div>
+          
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+              <input
+                type="checkbox"
+                checked={useCustomLocation}
+                onChange={e => setUseCustomLocation(e.target.checked)}
+                className="w-4 h-4 bg-dark-bg border border-dark-border rounded focus:ring-accent-blue"
+              />
+              Custom Location <span className="text-gray-500">(optional)</span>
+            </label>
+            {useCustomLocation && (
+              <div className="flex items-center gap-2">
+                <Folder className="w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={customLocation}
+                  onChange={e => setCustomLocation(e.target.value)}
+                  placeholder="e.g., C:\Downloads\MyProject or ~/Downloads/MyProject"
+                  className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-4 py-2.5
+                    text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue transition-colors"
+                />
+              </div>
+            )}
+            {!useCustomLocation && (
+              <p className="text-xs text-gray-500 mt-1">
+                Project will be created in the default workspace directory
+              </p>
+            )}
           </div>
           
           <div className="flex items-center gap-3 pt-2">

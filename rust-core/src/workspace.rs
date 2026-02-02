@@ -67,17 +67,23 @@ impl WorkspaceManager {
     }
 
     /// Create a new project
-    pub fn create_project(&self, project: &Project) -> anyhow::Result<()> {
-        let project_dir = self.workspace_root
-            .join("projects")
-            .join(&project.id);
+    pub fn create_project(&self, project: &Project, custom_location: Option<&str>) -> anyhow::Result<()> {
+        let project_dir = if let Some(location) = custom_location {
+            // Use custom location if provided
+            PathBuf::from(location)
+        } else {
+            // Use default workspace location
+            self.workspace_root
+                .join("projects")
+                .join(&project.id)
+        };
         
         fs::create_dir_all(&project_dir)?;
         fs::create_dir_all(project_dir.join(".meta"))?;
         fs::create_dir_all(project_dir.join("files"))?;
         fs::create_dir_all(project_dir.join("notes"))?;
         
-        // Save project metadata
+        // Save project metadata with location information
         let meta_file = project_dir.join(".meta").join("project.json");
         fs::write(&meta_file, serde_json::to_string_pretty(project)?)?;
         

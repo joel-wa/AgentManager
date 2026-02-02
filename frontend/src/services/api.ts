@@ -107,11 +107,11 @@ class ApiService {
     return res.json();
   }
 
-  async createProject(name: string, description?: string): Promise<Project> {
+  async createProject(name: string, description?: string, location?: string): Promise<Project> {
     const res = await fetch(`${this.baseUrl}/api/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, location }),
     });
     if (!res.ok) throw new Error('Failed to create project');
     return res.json();

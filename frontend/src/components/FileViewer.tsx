@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Copy, Download, FileText, FileCode, FileJson, Image } from 'lucide-react'
+import { X, Save, Copy, Download, FileText, FileCode, FileJson, Image, ExternalLink } from 'lucide-react'
 
 type Props = {
   filePath: string
@@ -41,6 +41,17 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
 
   const handleDownload = () => {
     const blob = new Blob([editedContent], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleOpenWith = () => {
+    // Create a temporary link to trigger the download/open with dialog
+    const blob = new Blob([editedContent], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -103,6 +114,17 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenWith}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors text-sm"
+              title="Open with external application"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open With
+            </button>
+            
+            <div className="w-px h-6 bg-dark-border" />
+            
             <button
               onClick={handleCopy}
               className="p-2 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors"

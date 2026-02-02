@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { 
   ChevronDown, 
   Settings, 
@@ -9,6 +10,7 @@ import type { Project } from '../App'
 
 type Props = {
   project: Project | null
+  projects: Project[]
   workspaceHealth: 'good' | 'warning' | 'critical'
   onNewProject: () => void
   onProjectChange: (project: Project) => void
@@ -16,7 +18,8 @@ type Props = {
   suggestionCount: number
 }
 
-export function TopBar({ project, workspaceHealth, onNewProject, suggestionCount, onSettingsClick }: Props) {
+export function TopBar({ project, projects, workspaceHealth, onNewProject, onProjectChange, suggestionCount, onSettingsClick }: Props) {
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
   const getHealthColor = () => {
     switch (workspaceHealth) {
       case 'good': return 'text-green-500'
@@ -45,11 +48,48 @@ export function TopBar({ project, workspaceHealth, onNewProject, suggestionCount
         </div>
         
         {/* Project Selector */}
-        <div className="flex items-center gap-2 ml-4">
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-dark-hover rounded-md hover:bg-dark-border transition-colors">
+        <div className="flex items-center gap-2 ml-4 relative">
+          <button 
+            onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-dark-hover rounded-md hover:bg-dark-border transition-colors"
+          >
             <span className="text-sm text-white">{project?.name || 'Select Project'}</span>
             <ChevronDown className="w-4 h-4 text-gray-400" />
           </button>
+          
+          {/* Dropdown Menu */}
+          {showProjectDropdown && (
+            <>
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setShowProjectDropdown(false)}
+              />
+              <div className="absolute top-full left-0 mt-1 bg-dark-surface border border-dark-border rounded-lg shadow-xl z-20 min-w-[200px] max-h-[400px] overflow-y-auto">
+                {projects.length > 0 ? (
+                  projects.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        onProjectChange(p)
+                        setShowProjectDropdown(false)
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-dark-hover transition-colors
+                        ${p.id === project?.id ? 'bg-dark-hover text-accent-blue' : 'text-white'}`}
+                    >
+                      <div className="font-medium">{p.name}</div>
+                      {p.description && (
+                        <div className="text-xs text-gray-500 truncate">{p.description}</div>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-gray-500 text-sm">
+                    No projects yet
+                  </div>
+                )}
+              </div>
+            </>
+          )}
           
           <button 
             onClick={onNewProject}
