@@ -24,6 +24,8 @@ impl ToolCoordinator {
                 "read_file".to_string(),
                 "write_file".to_string(),
             ],
+            project_id: None,
+            workspace_root: None,
         };
 
         self.http_client

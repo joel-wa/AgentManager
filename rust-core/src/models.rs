@@ -156,6 +156,8 @@ pub struct AgentChatRequest {
     pub message: String,
     pub context: Option<String>,
     pub tools: Vec<String>,
+    pub project_id: Option<String>,
+    pub workspace_root: Option<String>,
 }
 
 /// Agent chat response (from Python service)

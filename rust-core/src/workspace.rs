@@ -91,6 +91,78 @@ impl WorkspaceManager {
         );
         fs::write(project_dir.join("README.md"), readme_content)?;
         
+        // Create soul.md - Agent personality/system prompt for this project
+        let soul_content = format!(
+            r#"# Agent Soul for {}
+
+You are an AI assistant helping with "{}".
+
+## Personality
+- Be helpful, concise, and accurate
+- Focus on the user's goals
+- Ask clarifying questions when needed
+
+## Project Context
+{}
+
+## Guidelines
+- Always work within this project's directory
+- Respect the file organization
+- Log important decisions to Recents.md
+
+## Remember
+- You have access to file tools (read, write, search, list)
+- You can execute commands when needed
+- Ask before making destructive changes
+"#,
+            project.name,
+            project.name,
+            project.description.clone().unwrap_or_else(|| "No description provided.".to_string())
+        );
+        fs::write(project_dir.join("soul.md"), soul_content)?;
+        
+        // Create Recents.md - Decision timeline
+        let recents_content = format!(
+            r#"# Recent Activity for {}
+
+This file tracks decisions, discussions, and important changes.
+
+## {} - Project Created
+**Context**: Initial project setup
+**Status**: Active
+"#,
+            project.name,
+            project.created_at.format("%Y-%m-%d")
+        );
+        fs::write(project_dir.join("Recents.md"), recents_content)?;
+        
+        // Create maintenance.md template
+        let maintenance_content = format!(
+            r#"# Maintenance Configuration for {}
+
+## Project Context
+{}
+
+## Important Files
+- `README.md` - Project overview
+- `soul.md` - Agent personality configuration
+- `Recents.md` - Decision timeline
+
+## Merge Rules
+- Add project-specific merge rules here
+
+## Outdated Patterns to Watch
+- Add patterns to flag as outdated
+
+## Custom Health Checks
+- [ ] README is up to date
+- [ ] soul.md reflects current project goals
+"#,
+            project.name,
+            project.description.clone().unwrap_or_else(|| "No description provided.".to_string())
+        );
+        fs::write(project_dir.join(".meta").join("maintenance.md"), maintenance_content)?;
+        
         tracing::info!("Created project: {} ({})", project.name, project.id);
         Ok(())
     }

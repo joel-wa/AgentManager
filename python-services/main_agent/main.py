@@ -41,6 +41,7 @@ class ChatRequest(BaseModel):
     context: Optional[str] = None
     tools: List[str] = []
     project_id: Optional[str] = None
+    workspace_root: Optional[str] = None
 
 
 class ToolCall(BaseModel):
@@ -87,15 +88,43 @@ async def chat(request: ChatRequest):
     Implements agentic loop: agent can see tool results and make follow-up decisions
     """
     try:
+        # Compute the project working directory
+        project_working_dir = None
+        if request.workspace_root and request.project_id:
+            project_working_dir = os.path.join(
+                request.workspace_root, "projects", request.project_id
+            )
+            # Ensure directory exists
+            os.makedirs(project_working_dir, exist_ok=True)
+        elif request.workspace_root:
+            project_working_dir = request.workspace_root
+        
+        print(f"[PROJECT] Working directory: {project_working_dir}")
+        
+        # Create project-specific tool executor
+        project_tool_executor = ToolExecutor(working_directory=project_working_dir)
+        
         # Get full tool schemas
-        tool_schemas = tool_executor.get_tool_schemas() if request.tools else []
+        tool_schemas = project_tool_executor.get_tool_schemas() if request.tools else []
         
         # Filter to only requested tools
         if request.tools:
             tool_schemas = [t for t in tool_schemas if t["name"] in request.tools]
         
-        # Build system prompt with tools
-        system_prompt = build_system_prompt(tool_schemas)
+        # Load soul.md if it exists (agent personality/system prompt)
+        soul_prompt = ""
+        if project_working_dir:
+            soul_path = os.path.join(project_working_dir, "soul.md")
+            if os.path.exists(soul_path):
+                try:
+                    with open(soul_path, 'r', encoding='utf-8') as f:
+                        soul_prompt = f.read()
+                    print(f"[SOUL] Loaded soul.md from {soul_path}")
+                except Exception as e:
+                    print(f"[SOUL] Error loading soul.md: {e}")
+        
+        # Build system prompt with tools and soul
+        system_prompt = build_system_prompt(tool_schemas, soul_prompt, project_working_dir)
         
         # Build initial messages
         messages = []
@@ -140,14 +169,14 @@ async def chat(request: ChatRequest):
                 print(f"[ITERATION {iteration + 1}] Final response: {response_text[:200]}...")
                 break
             
-            # Execute tools
+            # Execute tools using project-specific executor
             print(f"[ITERATION {iteration + 1}] Executing {len(tool_calls)} tool(s)...")
             iteration_results = []
             iteration_success_count = 0
             
             for tc in tool_calls:
                 print(f"  - Executing: {tc['name']}({list(tc['arguments'].keys())})")
-                result = await tool_executor.execute(tc["name"], tc["arguments"])
+                result = await project_tool_executor.execute(tc["name"], tc["arguments"])
                 tool_result = ToolResult(
                     tool_name=tc["name"],
                     success=result.success,
@@ -287,14 +316,30 @@ async def execute_tool(tool_name: str, arguments: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def build_system_prompt(tool_schemas: List[Dict[str, Any]]) -> str:
-    """Build system prompt with available tools and usage instructions"""
-    base_prompt = """You are a helpful AI workspace assistant. You help users organize their notes, research, and code files.
+def build_system_prompt(tool_schemas: List[Dict[str, Any]], soul_prompt: str = "", project_working_dir: str = None) -> str:
+    """Build system prompt with available tools, soul prompt, and usage instructions"""
+    
+    # Start with soul prompt if available (agent personality)
+    if soul_prompt:
+        base_prompt = soul_prompt.strip() + "\n\n"
+    else:
+        base_prompt = """You are a helpful AI workspace assistant. You help users organize their notes, research, and code files.
 You have access to a workspace where you can search, read, and write files.
-Always be helpful, concise, and accurate."""
+Always be helpful, concise, and accurate.
+
+"""
+    
+    # Add workspace context
+    if project_working_dir:
+        base_prompt += f"""# WORKSPACE CONTEXT
+Your current working directory is: {project_working_dir}
+All file operations (read, write, list) should use paths relative to this directory.
+For example, if you want to read "notes/meeting.md", use path "notes/meeting.md" not an absolute path.
+
+"""
 
     if tool_schemas:
-        base_prompt += "\n\n# TOOL USAGE INSTRUCTIONS\n"
+        base_prompt += "# TOOL USAGE INSTRUCTIONS\n"
         base_prompt += """When you need to use tools, respond ONLY with a JSON object in this EXACT format:
 ```json
 {
@@ -314,7 +359,9 @@ Workflow:
 1. If you need information -> Use tools (JSON format)
 2. After getting tool results -> Provide natural language answer
 3. If you need MORE information after seeing results -> Use more tools (JSON format)
-4. When you have enough information -> Give final answer (natural language)\n\n"""
+4. When you have enough information -> Give final answer (natural language)
+
+"""
         base_prompt += "# AVAILABLE TOOLS:\n\n"
         
         for tool in tool_schemas:

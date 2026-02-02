@@ -220,6 +220,88 @@ def calculate_health_score(workspace):
     return organization + duplicates + freshness + completeness + consistency
 ```
 
+## Recents.md - Decision Timeline
+
+Each project maintains a `Recents.md` file that serves as a living timeline of decisions, discussions, and changes. This is automatically maintained by the maintenance agent.
+
+### Purpose
+- Track decisions and their rationale
+- Link to relevant documents and code
+- Provide context for future work
+- Enable easy catching-up after breaks
+
+### Format
+```markdown
+# Recent Activity
+
+## 2024-01-20 - Authentication Refactor Decision
+**Context**: Moving from session-based to JWT authentication
+**Decision**: Use RS256 algorithm with 1-hour token expiry
+**Related**: [auth/strategy.md](auth/strategy.md), [api/tokens.md](api/tokens.md)
+**Status**: In Progress
+
+## 2024-01-18 - Database Migration
+**Context**: Scaling concerns with current schema
+**Decision**: Add read replicas, partition user table
+**Related**: [db/schema.md](db/schema.md)
+**Status**: Completed
+```
+
+### Automatic Updates
+The maintenance agent automatically adds entries when:
+- Major file changes are detected
+- Tool calls suggest decisions being made
+- User explicitly asks to log a decision
+- Multi-file edits suggest a refactoring
+
+## Per-Project Maintenance Documentation
+
+Each project can have a custom `maintenance.md` file that provides additional context to the AI maintainer.
+
+### Location
+```
+project/
+├── .meta/
+│   ├── project.json
+│   └── maintenance.md    <- Project-specific maintenance config
+├── Recents.md
+├── soul.md
+└── ... other files
+```
+
+### maintenance.md Format
+```markdown
+# Maintenance Configuration
+
+## Project Context
+Brief description of what this project is about and its goals.
+
+## Important Files
+- `config.json` - Core configuration, changes here affect everything
+- `api/` - Public API, maintain backward compatibility
+- `legacy/` - DO NOT modify, kept for reference only
+
+## Merge Rules
+- Never merge auth files with other files
+- Consolidate all neural network notes when similarity > 80%
+
+## Outdated Patterns to Watch
+- References to API v1 (deprecated)
+- Old date formats (YYYY/MM/DD instead of ISO)
+- Legacy function names: `oldFetch`, `legacyParse`
+
+## Custom Health Checks
+- [ ] README updated within last 30 days
+- [ ] No TODO comments older than 14 days
+- [ ] All markdown files have headers
+```
+
+### How It's Used
+1. Maintenance agent reads `maintenance.md` at analysis start
+2. Custom rules are applied alongside default rules
+3. Project-specific context improves suggestion quality
+4. User can edit to customize behavior
+
 ## Future Enhancements
 
 ### Phase 2
@@ -227,6 +309,8 @@ def calculate_health_score(workspace):
 - [ ] Cross-project analysis
 - [ ] Custom suggestion rules
 - [ ] Integration with version control
+- [x] Recents.md automatic timeline
+- [x] Per-project maintenance.md customization
 
 ### Phase 3
 - [ ] Predictive organization (suggest structure before problems)
@@ -252,6 +336,8 @@ def calculate_health_score(workspace):
    - Automated health scoring
    - README auto-update
    - Improved similarity detection
+   - Recents.md generation
+   - maintenance.md support
 
 3. **Future**
    - Learning from user feedback

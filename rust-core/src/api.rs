@@ -48,11 +48,19 @@ pub async fn chat(
 ) -> Result<Json<ChatResponse>, StatusCode> {
     let client = reqwest::Client::new();
     
-    // Forward request to Python agent service
+    // Get workspace root from settings
+    let workspace_root = {
+        let state = state.read().await;
+        state.settings.workspace_root.clone()
+    };
+    
+    // Forward request to Python agent service with workspace context
     let agent_request = AgentChatRequest {
         message: request.message.clone(),
         context: request.context.clone(),
         tools: request.tools.clone(),
+        project_id: request.project_id.clone(),
+        workspace_root: Some(workspace_root),
     };
     
     match client

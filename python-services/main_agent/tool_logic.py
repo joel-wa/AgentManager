@@ -707,8 +707,9 @@ class DeleteFileTool(BaseTool):
 class ToolRegistry:
     """Central registry for all tools - easily extensible"""
     
-    def __init__(self):
+    def __init__(self, working_directory: Optional[str] = None):
         self._tools: Dict[str, BaseTool] = {}
+        self._working_directory = working_directory
         self._register_default_tools()
     
     def _register_default_tools(self):
@@ -718,7 +719,7 @@ class ToolRegistry:
             ReadFileTool(),
             WriteFileTool(),
             ListDirectoryTool(),
-            ExecuteCommandTool(),
+            ExecuteCommandTool(working_directory=self._working_directory),
             FindRecentsTool(),
             CreateDirectoryTool(),
             DeleteFileTool(),
@@ -762,12 +763,18 @@ class ToolExecutor:
     """Executes tools and returns results"""
     
     def __init__(self, working_directory: Optional[str] = None):
-        self.registry = ToolRegistry()
         self._working_directory = working_directory
-        
-        # Update execute command tool with working directory
-        if working_directory:
-            self.registry.register(ExecuteCommandTool(working_directory=working_directory))
+        self.registry = ToolRegistry(working_directory=working_directory)
+    
+    def _resolve_path(self, path: str) -> str:
+        """Resolve a path relative to working directory"""
+        if not path:
+            return path
+        if os.path.isabs(path):
+            return path
+        if self._working_directory:
+            return os.path.join(self._working_directory, path)
+        return path
     
     async def execute(
         self, 
@@ -785,8 +792,17 @@ class ToolExecutor:
                 error=f"Unknown tool: {tool_name}. Available: {[t.name for t in self.registry.list_tools()]}"
             )
         
+        # Resolve paths in arguments relative to working directory
+        resolved_args = dict(arguments)
+        if 'path' in resolved_args and self._working_directory:
+            resolved_args['path'] = self._resolve_path(resolved_args['path'])
+        if 'working_directory' not in resolved_args and self._working_directory:
+            # Default working directory for execute_command
+            if tool_name == 'execute_command':
+                resolved_args['working_directory'] = self._working_directory
+        
         try:
-            result = await tool.execute(arguments)
+            result = await tool.execute(resolved_args)
             result.execution_time_ms = (time.time() - start_time) * 1000
             return result
         except Exception as e:
