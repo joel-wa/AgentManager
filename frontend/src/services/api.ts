@@ -241,7 +241,7 @@ class ApiService {
       onComplete({
         response: finalResponse,
         tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-        message_id: messageId || Date.now().toString(),
+        message_id: messageId || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       });
     } catch (error) {
       onError(error instanceof Error ? error : new Error('Unknown error'));

@@ -229,7 +229,7 @@ function App() {
             toolActivities.push(activity)
             streamedContent += `\n🔧 ${event.name}...`
           } else if (event.type === 'tool_result') {
-            streamedContent += `\n✓ ${event.name} ${event.success ? 'completed' : 'failed'}`
+            streamedContent += `\n✓ ${event.name ?? 'operation'} ${event.success ? 'completed' : 'failed'}`
           } else if (event.type === 'response') {
             streamedContent = event.content || ''
           }

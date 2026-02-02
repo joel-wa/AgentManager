@@ -78,7 +78,7 @@ impl WorkspaceManager {
     }
 
     /// Create a new project
-    pub fn create_project(&self, project: &Project, _custom_location: Option<&str>) -> anyhow::Result<()> {
+    pub fn create_project(&self, project: &Project) -> anyhow::Result<()> {
         // Get project directory (either custom or default)
         let project_dir = self.get_project_dir(project);
         

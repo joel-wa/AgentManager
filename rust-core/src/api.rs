@@ -216,7 +216,7 @@ pub async fn create_project(
     let project = Project::new(payload.name, payload.description)
         .with_location(payload.location.clone());
     
-    match state.workspace.create_project(&project, payload.location.as_deref()) {
+    match state.workspace.create_project(&project) {
         Ok(_) => Ok(Json(project)),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
