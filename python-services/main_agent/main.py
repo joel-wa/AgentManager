@@ -341,27 +341,36 @@ You can use either relative or absolute paths for file operations:
 """
 
     if tool_schemas:
-        base_prompt += "# TOOL USAGE INSTRUCTIONS\n"
-        base_prompt += """When you need to use tools, respond ONLY with a JSON object in this EXACT format:
+        base_prompt += """
+# TOOL CALLING
+
+To use tools, output ONLY this (no other text):
 ```json
-{
-  "tool_calls": [
-    {
-      "name": "tool_name",
-      "arguments": {"arg1": "value1", "arg2": "value2"}
-    }
-  ]
-}
+{"tool_calls": [{"name": "tool_name", "arguments": {"param": "value"}}]}
 ```
 
-After seeing tool results, respond naturally with your answer. Do NOT use JSON format for your final response.
-You can call multiple tools at once by adding more objects to the tool_calls array.
+RIGHT:
+User: "read package.json"
+You: ```json
+{"tool_calls": [{"name": "read_file", "arguments": {"path": "package.json"}}]}
+```
 
-Workflow:
-1. If you need information -> Use tools (JSON format)
-2. After getting tool results -> Provide natural language answer
-3. If you need MORE information after seeing results -> Use more tools (JSON format)
-4. When you have enough information -> Give final answer (natural language)
+WRONG:
+User: "read package.json"
+You: "Let me read that file."
+```json
+{"tool_calls": [{"name": "read_file", "arguments": {"path": "package.json"}}]}
+```
+^ FAILS because of text before JSON
+
+WRONG:
+User: "read package.json"  
+You: ```json
+{"name": "read_file", "arguments": {"path": "package.json"}}
+```
+^ FAILS because missing "tool_calls" array wrapper
+
+Rule: Need info? → Output pure JSON. Have info? → Answer normally.
 
 """
         base_prompt += "# AVAILABLE TOOLS:\n\n"

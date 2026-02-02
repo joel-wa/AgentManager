@@ -179,7 +179,7 @@ function App() {
       const response = await api.sendMessage({
         message: content,
         context: currentProject?.description,
-        tools: ['search', 'read_file', 'write_file', 'execute_command'],
+        tools: ['search', 'read_file', 'write_file', 'list_directory', 'execute_command', 'find_recents', 'create_directory', 'delete_file'],
         project_id: currentProject?.id
       })
       
