@@ -3,7 +3,6 @@ use axum::{
     http::StatusCode,
     Json,
     response::sse::{Event, Sse},
-    body::Body,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;

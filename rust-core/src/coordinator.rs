@@ -26,6 +26,7 @@ impl ToolCoordinator {
             ],
             project_id: None,
             workspace_root: None,
+            chat_history: None,
         };
 
         self.http_client
