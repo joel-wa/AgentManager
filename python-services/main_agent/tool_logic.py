@@ -469,8 +469,13 @@ class ExecuteCommandTool(BaseTool):
             is_windows = sys.platform == "win32"
             
             if is_windows:
-                # Use cmd.exe on Windows
-                shell_cmd = ["cmd", "/c", command]
+                # Check if command explicitly starts with powershell
+                if command.strip().lower().startswith(('powershell', 'pwsh')):
+                    # Execute PowerShell directly to avoid cmd.exe quoting issues
+                    shell_cmd = ["powershell", "-NoProfile", "-Command", command.strip().split(None, 2)[2] if len(command.strip().split(None, 2)) > 2 else ""]
+                else:
+                    # Use cmd.exe for other commands
+                    shell_cmd = ["cmd", "/c", command]
             else:
                 # Use bash on Unix
                 shell_cmd = ["/bin/bash", "-c", command]

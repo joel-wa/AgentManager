@@ -5,7 +5,7 @@
 ### Option 1: One-Click Launch (Recommended)
 
 ```powershell
-.\build-app.ps1     # Build everything once
+.\build-app-clean.ps1     # Build everything once
 .\start-app.ps1     # Start the application
 ```
 

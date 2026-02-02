@@ -195,22 +195,18 @@ function App() {
         }))
       }
       setMessages(prev => [...prev, assistantMessage])
-    } catch {
-      // Fallback to simulated response
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'I\'ve searched through your workspace and found relevant information. Let me summarize the key points for you...\n\nBased on your notes, here are the main topics:\n\n1. **Authentication Patterns** - OAuth 2.0, JWT tokens\n2. **API Design** - RESTful principles, versioning strategies\n3. **Database Schema** - User models, session management',
-          timestamp: new Date(),
-          toolActivity: [
-            { type: 'search', description: 'Searched workspace for relevant content', timestamp: new Date() },
-            { type: 'read', description: 'Read auth/strategy.md', filePath: 'auth/strategy.md', timestamp: new Date() },
-            { type: 'write', description: 'Created notes/session_summary.md', filePath: 'notes/session_summary.md', timestamp: new Date() }
-          ]
-        }
-        setMessages(prev => [...prev, assistantMessage])
-      }, 1500)
+    } catch (error) {
+      // Log the actual error for debugging
+      console.error('Failed to send message to backend:', error)
+      
+      // Show error message to user instead of fake response
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error connecting to the backend service. Please make sure all services are running.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }

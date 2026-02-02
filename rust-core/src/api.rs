@@ -70,7 +70,8 @@ pub async fn chat(
         .await
     {
         Ok(response) => {
-            if response.status().is_success() {
+            let status = response.status();
+            if status.is_success() {
                 match response.json::<AgentChatResponse>().await {
                     Ok(agent_response) => {
                         // Log the interaction
@@ -85,15 +86,21 @@ pub async fn chat(
                             message_id: agent_response.message_id,
                         }))
                     }
-                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                    Err(e) => {
+                        tracing::error!("Failed to parse agent response: {}", e);
+                        Err(StatusCode::INTERNAL_SERVER_ERROR)
+                    }
                 }
             } else {
-                // Agent service returned an error
+                // Agent service returned an error - get the error message
+                let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+                tracing::error!("Agent service error (status {}): {}", status, error_text);
                 Err(StatusCode::BAD_GATEWAY)
             }
         }
-        Err(_) => {
-            // Agent service not available - return a fallback response
+        Err(e) => {
+            // Agent service not available
+            tracing::error!("Failed to connect to agent service: {}", e);
             Ok(Json(ChatResponse {
                 response: "I'm sorry, but I'm currently unable to process your request. The AI agent service is not available. Please ensure Ollama is running and try again.".to_string(),
                 tool_calls: None,

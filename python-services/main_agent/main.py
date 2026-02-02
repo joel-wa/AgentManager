@@ -188,7 +188,7 @@ async def chat(request: ChatRequest):
                 iteration_results.append(tool_result)
                 all_tool_calls.append(ToolCall(name=tc["name"], arguments=tc["arguments"]))
                 all_tool_results.append(tool_result)
-                status = "✓" if result.success else "✗"
+                status = "[OK]" if result.success else "[FAIL]"
                 print(f"    {status} {tc['name']}: {result.success}")
                 
                 if result.success:
