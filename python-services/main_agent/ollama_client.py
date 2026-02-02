@@ -130,26 +130,36 @@ class OllamaClient:
         """
         tool_calls = []
         
-        # First, try to parse JSON format (preferred)
-        json_pattern = r'```json\s*\n?({[\s\S]*?})\s*\n?```'
-        json_matches = re.findall(json_pattern, content, re.IGNORECASE | re.MULTILINE)
+        # First, try to parse JSON format (preferred) - multiple patterns
+        json_patterns = [
+            r'```json\s*\n?({[\s\S]*?})\s*\n?```',  # Standard markdown json block
+            r'```\s*\n?({[\s\S]*?"tool_calls"[\s\S]*?})\s*\n?```',  # Code block with tool_calls
+            r'({[\s\S]*?"tool_calls"[\s\S]*?})',  # Raw JSON with tool_calls (no markdown)
+        ]
         
-        for json_str in json_matches:
-            try:
-                data = json.loads(json_str)
-                if isinstance(data, dict) and "tool_calls" in data:
-                    calls = data["tool_calls"]
-                    if isinstance(calls, list):
-                        for call in calls:
-                            if isinstance(call, dict) and "name" in call and "arguments" in call:
-                                tool_name = call["name"]
-                                if tool_name.lower() in [t.lower() for t in available_tools]:
-                                    tool_calls.append({
-                                        "name": tool_name.lower(),
-                                        "arguments": call["arguments"]
-                                    })
-            except json.JSONDecodeError:
-                pass  # Try legacy patterns
+        for pattern in json_patterns:
+            json_matches = re.findall(pattern, content, re.IGNORECASE | re.MULTILINE)
+            
+            for json_str in json_matches:
+                try:
+                    data = json.loads(json_str)
+                    if isinstance(data, dict) and "tool_calls" in data:
+                        calls = data["tool_calls"]
+                        if isinstance(calls, list):
+                            for call in calls:
+                                if isinstance(call, dict) and "name" in call and "arguments" in call:
+                                    tool_name = call["name"]
+                                    if tool_name.lower() in [t.lower() for t in available_tools]:
+                                        tool_calls.append({
+                                            "name": tool_name.lower(),
+                                            "arguments": call["arguments"]
+                                        })
+                except json.JSONDecodeError:
+                    continue  # Try next pattern
+            
+            # If we found tool calls with this pattern, stop trying other patterns
+            if tool_calls:
+                break
         
         # If JSON parsing succeeded, return those calls
         if tool_calls:

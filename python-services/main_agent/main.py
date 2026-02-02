@@ -116,10 +116,11 @@ async def chat(request: ChatRequest):
         })
         
         # Agentic loop: allow agent to see results and iterate
-        max_iterations = 5  # Prevent infinite loops
+        max_iterations = 15  # Increased limit to allow more complex tasks
         all_tool_calls = []
         all_tool_results = []
         final_response = ""
+        consecutive_failed_calls = 0  # Track failures to detect when agent is stuck
         
         print(f"\n[AGENTIC LOOP] Starting with max {max_iterations} iterations")
         
@@ -142,6 +143,8 @@ async def chat(request: ChatRequest):
             # Execute tools
             print(f"[ITERATION {iteration + 1}] Executing {len(tool_calls)} tool(s)...")
             iteration_results = []
+            iteration_success_count = 0
+            
             for tc in tool_calls:
                 print(f"  - Executing: {tc['name']}({list(tc['arguments'].keys())})")
                 result = await tool_executor.execute(tc["name"], tc["arguments"])
@@ -157,6 +160,33 @@ async def chat(request: ChatRequest):
                 all_tool_results.append(tool_result)
                 status = "✓" if result.success else "✗"
                 print(f"    {status} {tc['name']}: {result.success}")
+                
+                if result.success:
+                    iteration_success_count += 1
+            
+            # Track consecutive failures to detect if agent is stuck
+            if iteration_success_count == 0:
+                consecutive_failed_calls += 1
+                if consecutive_failed_calls >= 3:
+                    print(f"[ITERATION {iteration + 1}] ERROR: Agent stuck with 3 consecutive failed tool calls")
+                    # Add error message to help agent understand the situation
+                    tool_results_text = "[SYSTEM ERROR]\n"
+                    tool_results_text += "You have made 3 consecutive iterations with failed tool calls. "
+                    tool_results_text += "Please provide a final answer based on what you know, or explain what information you're missing.\n"
+                    tool_results_text += "Do NOT call more tools - provide a natural language response now.\n"
+                    
+                    messages.append({
+                        "role": "user",
+                        "content": tool_results_text
+                    })
+                    
+                    # Force one final response from agent
+                    print(f"[ITERATION {iteration + 1}] Forcing final response due to stuck state...")
+                    response_text, _ = await ollama_client.chat(messages, [])  # No tools allowed
+                    final_response = response_text
+                    break
+            else:
+                consecutive_failed_calls = 0
             
             # Add assistant's response to conversation
             messages.append({
