@@ -41,6 +41,19 @@ export interface ChatResponse {
   message_id: string;
 }
 
+export interface StreamEvent {
+  type: 'status' | 'iteration' | 'tool_call' | 'tool_result' | 'response' | 'done' | 'error';
+  message?: string;
+  number?: number;
+  name?: string;
+  arguments?: Record<string, unknown>;
+  success?: boolean;
+  preview?: string;
+  content?: string;
+  message_id?: string;
+  tool_calls?: number;
+}
+
 export interface TimelineEntry {
   id: string;
   timestamp: string;
@@ -158,6 +171,81 @@ class ApiService {
       throw new Error(error.detail || 'Failed to send message');
     }
     return res.json();
+  }
+
+  // Chat with streaming using Server-Sent Events
+  async sendMessageStream(
+    request: ChatRequest,
+    onEvent: (event: StreamEvent) => void,
+    onComplete: (response: ChatResponse) => void,
+    onError: (error: Error) => void
+  ): Promise<void> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+      let toolCalls: ToolCall[] = [];
+      let finalResponse = '';
+      let messageId = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const event = JSON.parse(data) as StreamEvent;
+              onEvent(event);
+
+              // Track data for final response
+              if (event.type === 'tool_call') {
+                toolCalls.push({
+                  name: event.name!,
+                  arguments: event.arguments || {},
+                });
+              } else if (event.type === 'response') {
+                finalResponse = event.content || '';
+              } else if (event.type === 'done') {
+                messageId = event.message_id || '';
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e, data);
+            }
+          }
+        }
+      }
+
+      // Call completion callback
+      onComplete({
+        response: finalResponse,
+        tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+        message_id: messageId || Date.now().toString(),
+      });
+    } catch (error) {
+      onError(error instanceof Error ? error : new Error('Unknown error'));
+    }
   }
 
   // WebSocket connection for real-time chat

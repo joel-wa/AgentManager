@@ -178,6 +178,17 @@ function App() {
     setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
     
+    // Create a placeholder assistant message for streaming updates
+    const assistantMessageId = (Date.now() + 1).toString()
+    const placeholderMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      toolActivity: []
+    }
+    setMessages(prev => [...prev, placeholderMessage])
+    
     try {
       // Prepare chat history (last 10 messages for context, excluding assistant messages without content)
       const chatHistory = messages
@@ -188,47 +199,98 @@ function App() {
           content: m.content
         }))
       
-      // Try to send to backend
-      const response = await api.sendMessage({
+      const request = {
         message: content,
         context: currentProject?.description,
         tools: ['search', 'read_file', 'write_file', 'list_directory', 'execute_command', 'find_recents', 'create_directory', 'delete_file'],
         project_id: currentProject?.id,
         chat_history: chatHistory
-      })
-      
-      const assistantMessage: Message = {
-        id: response.message_id,
-        role: 'assistant',
-        content: response.response,
-        timestamp: new Date(),
-        toolActivity: response.tool_calls?.map(tc => ({
-          type: tc.name as 'search' | 'read' | 'write' | 'execute',
-          description: `${tc.name}: ${JSON.stringify(tc.arguments)}`,
-          timestamp: new Date()
-        }))
       }
-      setMessages(prev => [...prev, assistantMessage])
       
-      // Check if we should trigger a summary (every 10 messages)
-      // Note: messages.length + 2 accounts for user and assistant messages just added
-      const totalMessages = messages.length + 2
-      if (totalMessages % 10 === 0 && currentProject) {
-        // Trigger maintenance agent to create a summary
-        triggerSummaryGeneration(currentProject.id, [...messages, userMessage, assistantMessage])
-      }
+      let streamedContent = ''
+      const toolActivities: ToolActivity[] = []
+      
+      // Use streaming API
+      await api.sendMessageStream(
+        request,
+        // onEvent - handle streaming events
+        (event) => {
+          if (event.type === 'status') {
+            // Update loading message
+            streamedContent = event.message || 'Processing...'
+          } else if (event.type === 'iteration') {
+            streamedContent += `\n[Iteration ${event.number}]`
+          } else if (event.type === 'tool_call') {
+            const activity: ToolActivity = {
+              type: event.name as 'search' | 'read' | 'write' | 'execute',
+              description: `${event.name}: ${JSON.stringify(event.arguments)}`,
+              timestamp: new Date()
+            }
+            toolActivities.push(activity)
+            streamedContent += `\n🔧 ${event.name}...`
+          } else if (event.type === 'tool_result') {
+            streamedContent += `\n✓ ${event.name} ${event.success ? 'completed' : 'failed'}`
+          } else if (event.type === 'response') {
+            streamedContent = event.content || ''
+          }
+          
+          // Update the placeholder message with streamed content
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMessageId 
+              ? { ...m, content: streamedContent, toolActivity: toolActivities }
+              : m
+          ))
+        },
+        // onComplete - final response received
+        (response) => {
+          const finalMessage: Message = {
+            id: response.message_id,
+            role: 'assistant',
+            content: response.response,
+            timestamp: new Date(),
+            toolActivity: response.tool_calls?.map(tc => ({
+              type: tc.name as 'search' | 'read' | 'write' | 'execute',
+              description: `${tc.name}: ${JSON.stringify(tc.arguments)}`,
+              timestamp: new Date()
+            }))
+          }
+          
+          // Replace placeholder with final message
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMessageId ? finalMessage : m
+          ))
+          
+          // Check if we should trigger a summary (every 10 messages)
+          const totalMessages = messages.length + 2
+          if (totalMessages % 10 === 0 && currentProject) {
+            triggerSummaryGeneration(currentProject.id, [...messages, userMessage, finalMessage])
+          }
+        },
+        // onError - handle errors
+        (error) => {
+          console.error('Streaming error:', error)
+          const errorMessage: Message = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: `Sorry, I encountered an error: ${error.message}`,
+            timestamp: new Date()
+          }
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMessageId ? errorMessage : m
+          ))
+        }
+      )
     } catch (error) {
-      // Log the actual error for debugging
-      console.error('Failed to send message to backend:', error)
-      
-      // Show error message to user instead of fake response
+      console.error('Failed to send message:', error)
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: assistantMessageId,
         role: 'assistant',
         content: `Sorry, I encountered an error connecting to the backend service. Please make sure all services are running.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date()
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => prev.map(m => 
+        m.id === assistantMessageId ? errorMessage : m
+      ))
     } finally {
       setIsLoading(false)
     }
