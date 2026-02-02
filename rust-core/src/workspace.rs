@@ -20,6 +20,17 @@ impl WorkspaceManager {
         Ok(Self { workspace_root })
     }
 
+    /// Get project directory path (either custom location or default)
+    fn get_project_dir(&self, project: &Project) -> PathBuf {
+        if let Some(location) = &project.location {
+            PathBuf::from(location)
+        } else {
+            self.workspace_root
+                .join("projects")
+                .join(&project.id)
+        }
+    }
+
     /// Ensure workspace directory structure exists
     pub fn ensure_workspace_exists(&self) -> anyhow::Result<()> {
         let projects_dir = self.workspace_root.join("projects");
@@ -67,16 +78,9 @@ impl WorkspaceManager {
     }
 
     /// Create a new project
-    pub fn create_project(&self, project: &Project, custom_location: Option<&str>) -> anyhow::Result<()> {
-        let project_dir = if let Some(location) = custom_location {
-            // Use custom location if provided
-            PathBuf::from(location)
-        } else {
-            // Use default workspace location
-            self.workspace_root
-                .join("projects")
-                .join(&project.id)
-        };
+    pub fn create_project(&self, project: &Project, _custom_location: Option<&str>) -> anyhow::Result<()> {
+        // Get project directory (either custom or default)
+        let project_dir = self.get_project_dir(project);
         
         fs::create_dir_all(&project_dir)?;
         fs::create_dir_all(project_dir.join(".meta"))?;
@@ -191,9 +195,11 @@ This file tracks decisions, discussions, and important changes.
 
     /// List files in project
     pub fn list_files(&self, project_id: &str) -> anyhow::Result<Vec<FileItem>> {
-        let project_dir = self.workspace_root
-            .join("projects")
-            .join(project_id);
+        // Load project to get its location
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        
+        let project_dir = self.get_project_dir(&project);
         
         self.scan_directory(&project_dir, &project_dir, 0)
     }
@@ -261,20 +267,22 @@ This file tracks decisions, discussions, and important changes.
 
     /// Read file content
     pub fn read_file(&self, project_id: &str, path: &str) -> anyhow::Result<String> {
-        let file_path = self.workspace_root
-            .join("projects")
-            .join(project_id)
-            .join(path);
+        // Load project to get its location
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        
+        let file_path = self.get_project_dir(&project).join(path);
         
         Ok(fs::read_to_string(file_path)?)
     }
 
     /// Write file content
     pub fn write_file(&self, project_id: &str, path: &str, content: &str) -> anyhow::Result<()> {
-        let file_path = self.workspace_root
-            .join("projects")
-            .join(project_id)
-            .join(path);
+        // Load project to get its location
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        
+        let file_path = self.get_project_dir(&project).join(path);
         
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {

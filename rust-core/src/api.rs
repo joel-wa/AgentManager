@@ -213,7 +213,8 @@ pub async fn create_project(
     Json(payload): Json<CreateProjectRequest>,
 ) -> Result<Json<Project>, StatusCode> {
     let state = state.read().await;
-    let project = Project::new(payload.name, payload.description);
+    let project = Project::new(payload.name, payload.description)
+        .with_location(payload.location.clone());
     
     match state.workspace.create_project(&project, payload.location.as_deref()) {
         Ok(_) => Ok(Json(project)),

@@ -10,6 +10,9 @@ pub struct Project {
     pub description: Option<String>,
     pub created_at: DateTime<Utc>,
     pub last_accessed: DateTime<Utc>,
+    /// Custom location for project files (if not in default workspace)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
 }
 
 impl Project {
@@ -21,7 +24,13 @@ impl Project {
             description,
             created_at: now,
             last_accessed: now,
+            location: None,
         }
+    }
+    
+    pub fn with_location(mut self, location: Option<String>) -> Self {
+        self.location = location;
+        self
     }
 }
 
