@@ -1,0 +1,7 @@
+{
+  "message": "hello",
+  "context": "test",
+  "tools": [],
+  "project_id": "test",
+  "workspace_root": "C:\\Users\\RanVic\\AgentManager"
+}

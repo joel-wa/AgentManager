@@ -464,23 +464,27 @@ class ExecuteCommandTool(BaseTool):
                 error="No command provided"
             )
         
+        start_time = time.time()
+        
         try:
             # Determine shell based on OS
             is_windows = sys.platform == "win32"
             
             if is_windows:
-                # Use cmd.exe on Windows
-                shell_cmd = ["cmd", "/c", command]
+                # Use PowerShell for better compatibility and performance
+                # PowerShell handles pipes, redirects, and variables natively
+                shell_cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command]
             else:
                 # Use bash on Unix
                 shell_cmd = ["/bin/bash", "-c", command]
             
-            # Run command asynchronously
+            # Run command asynchronously with better buffering
             process = await asyncio.create_subprocess_exec(
                 *shell_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=working_dir
+                cwd=working_dir,
+                creationflags=subprocess.CREATE_NO_WINDOW if is_windows else 0
             )
             
             try:
@@ -489,31 +493,55 @@ class ExecuteCommandTool(BaseTool):
                     timeout=timeout
                 )
                 
+                execution_time = (time.time() - start_time) * 1000
+                
+                # Decode output with better encoding handling
+                stdout_text = stdout.decode("utf-8", errors="replace").strip()
+                stderr_text = stderr.decode("utf-8", errors="replace").strip()
+                
+                # Success if return code is 0
+                success = process.returncode == 0
+                
                 return ToolResult(
-                    success=process.returncode == 0,
+                    success=success,
                     result={
                         "command": command,
                         "return_code": process.returncode,
-                        "stdout": stdout.decode("utf-8", errors="replace"),
-                        "stderr": stderr.decode("utf-8", errors="replace"),
-                        "working_directory": working_dir
+                        "stdout": stdout_text,
+                        "stderr": stderr_text,
+                        "working_directory": working_dir or os.getcwd()
                     },
-                    error=None if process.returncode == 0 else f"Command exited with code {process.returncode}"
+                    error=stderr_text if not success and stderr_text else None,
+                    execution_time_ms=execution_time
                 )
                 
             except asyncio.TimeoutError:
-                process.kill()
+                try:
+                    process.kill()
+                    await process.wait()
+                except:
+                    pass
+                    
                 return ToolResult(
                     success=False,
-                    result={"command": command},
-                    error=f"Command timed out after {timeout} seconds"
+                    result={"command": command, "working_directory": working_dir},
+                    error=f"Command timed out after {timeout} seconds",
+                    execution_time_ms=(time.time() - start_time) * 1000
                 )
                 
+        except FileNotFoundError as e:
+            return ToolResult(
+                success=False,
+                result={"command": command},
+                error=f"Command not found: {str(e)}",
+                execution_time_ms=(time.time() - start_time) * 1000
+            )
         except Exception as e:
             return ToolResult(
                 success=False,
                 result={"command": command},
-                error=str(e)
+                error=f"Execution error: {str(e)}",
+                execution_time_ms=(time.time() - start_time) * 1000
             )
 
 
