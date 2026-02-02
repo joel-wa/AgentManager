@@ -50,7 +50,10 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
   }
 
   const handleOpenWith = () => {
-    // Create a temporary link to trigger the download/open with dialog
+    // Note: Creates a blob with application/octet-stream type and triggers download.
+    // Browser behavior varies: most browsers will download the file, which can then be 
+    // opened with the user's preferred application. True "Open With" dialog depends on 
+    // OS/browser integration and may require desktop application support.
     const blob = new Blob([editedContent], { type: 'application/octet-stream' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

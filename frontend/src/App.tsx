@@ -179,9 +179,9 @@ function App() {
     setIsLoading(true)
     
     try {
-      // Prepare chat history (last 10 messages for context, excluding system messages)
+      // Prepare chat history (last 10 messages for context, excluding assistant messages without content)
       const chatHistory = messages
-        .filter(m => m.role !== 'assistant' || m.content) // Exclude empty assistant messages
+        .filter(m => m.role !== 'assistant' || m.content) // Keep all user messages and assistant messages with content
         .slice(-10) // Last 10 messages
         .map(m => ({
           role: m.role,
@@ -211,10 +211,11 @@ function App() {
       setMessages(prev => [...prev, assistantMessage])
       
       // Check if we should trigger a summary (every 10 messages)
-      const totalMessages = messages.length + 2 // +2 for user and assistant messages we just added
+      // Note: messages.length + 2 accounts for user and assistant messages just added
+      const totalMessages = messages.length + 2
       if (totalMessages % 10 === 0 && currentProject) {
         // Trigger maintenance agent to create a summary
-        triggerSummaryGeneration(currentProject.id, messages)
+        triggerSummaryGeneration(currentProject.id, [...messages, userMessage, assistantMessage])
       }
     } catch (error) {
       // Log the actual error for debugging

@@ -366,12 +366,14 @@ async def chat_stream(request: ChatRequest):
                     yield f"data: {json.dumps({'type': 'response', 'content': response_text})}\n\n"
                     break
                 
-                # Send tool call notifications
+                # Send tool call notifications and execute tools
+                iteration_results = []
                 for tc in tool_calls:
                     yield f"data: {json.dumps({'type': 'tool_call', 'name': tc['name'], 'arguments': tc['arguments']})}\n\n"
                     
-                    # Execute tool
+                    # Execute tool once
                     result = await project_tool_executor.execute(tc["name"], tc["arguments"])
+                    iteration_results.append(result)
                     
                     # Send tool result
                     yield f"data: {json.dumps({'type': 'tool_result', 'name': tc['name'], 'success': result.success, 'preview': str(result.result)[:100]})}\n\n"
@@ -383,8 +385,7 @@ async def chat_stream(request: ChatRequest):
                 
                 # Add tool results
                 tool_results_text = "[TOOL RESULTS]\n"
-                for tc in tool_calls:
-                    result = await project_tool_executor.execute(tc["name"], tc["arguments"])
+                for tc, result in zip(tool_calls, iteration_results):
                     if result.success:
                         tool_results_text += f"\n{tc['name']}: {str(result.result)[:200]}\n"
                     else:
