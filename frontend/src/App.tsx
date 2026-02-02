@@ -57,19 +57,13 @@ export type Suggestion = {
 type SidePanel = 'files' | 'search' | 'timeline' | 'insights'
 
 function App() {
-  const [currentProject, setCurrentProject] = useState<Project | null>({
-    id: '1',
-    name: 'ML Research Notes',
-    description: 'Notes and research on machine learning topics',
-    createdAt: new Date('2024-01-15'),
-    lastAccessed: new Date()
-  })
+  const [currentProject, setCurrentProject] = useState<Project | null>(null)
   
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Hello! I\'m your AI workspace assistant. I can help you organize notes, search through your files, and maintain your knowledge base. What would you like to work on today?',
+      content: 'Hello! I\'m your AI workspace assistant. I can help you organize notes, search through your files, and maintain your knowledge base. Create or select a project to get started.',
       timestamp: new Date(),
       toolActivity: []
     }
@@ -130,6 +124,7 @@ function App() {
   // Check backend health on mount
   useEffect(() => {
     checkHealth()
+    loadProjects()
   }, [])
 
   const checkHealth = async () => {
@@ -144,6 +139,27 @@ function App() {
       }
     } catch {
       setWorkspaceHealth('critical')
+    }
+  }
+
+  const loadProjects = async () => {
+    try {
+      const projects = await api.listProjects()
+      if (projects.length > 0) {
+        // Auto-select the most recently accessed project
+        const sorted = projects.sort((a, b) => 
+          new Date(b.last_accessed).getTime() - new Date(a.last_accessed).getTime()
+        )
+        setCurrentProject({
+          id: sorted[0].id,
+          name: sorted[0].name,
+          description: sorted[0].description,
+          createdAt: new Date(sorted[0].created_at),
+          lastAccessed: new Date(sorted[0].last_accessed)
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load projects:', err)
     }
   }
 

@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::fs;
-use directories::ProjectDirs;
 
 use crate::models::{Project, FileItem, FileType};
 
@@ -11,12 +10,12 @@ pub struct WorkspaceManager {
 
 impl WorkspaceManager {
     pub fn new() -> anyhow::Result<Self> {
-        let workspace_root = if let Some(proj_dirs) = ProjectDirs::from("com", "agent-workspace", "AgentWorkspace") {
-            proj_dirs.data_dir().to_path_buf()
-        } else {
-            PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
-                .join(".agent-workspace")
-        };
+        // Use .agent-workspace in user's home directory
+        let home_dir = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".to_string());
+        
+        let workspace_root = PathBuf::from(home_dir).join(".agent-workspace");
         
         Ok(Self { workspace_root })
     }
@@ -190,10 +189,10 @@ This file tracks decisions, discussions, and important changes.
             .join("projects")
             .join(project_id);
         
-        self.scan_directory(&project_dir, 0)
+        self.scan_directory(&project_dir, &project_dir, 0)
     }
 
-    fn scan_directory(&self, path: &PathBuf, depth: usize) -> anyhow::Result<Vec<FileItem>> {
+    fn scan_directory(&self, path: &PathBuf, base_dir: &PathBuf, depth: usize) -> anyhow::Result<Vec<FileItem>> {
         let mut items = Vec::new();
         
         if depth > 3 || !path.is_dir() {
@@ -210,15 +209,21 @@ This file tracks decisions, discussions, and important changes.
                     continue;
                 }
                 
+                // Generate relative path from base directory
+                let relative_path = entry_path
+                    .strip_prefix(base_dir)
+                    .ok()
+                    .map(|p| p.to_string_lossy().replace('\\', "/"));
+                
                 if entry_path.is_dir() {
-                    let children = self.scan_directory(&entry_path, depth + 1)?;
+                    let children = self.scan_directory(&entry_path, base_dir, depth + 1)?;
                     items.push(FileItem {
                         name: name.clone(),
                         file_type: FileType::Folder,
                         extension: None,
                         children: Some(children),
                         summary: None,
-                        path: Some(entry_path.to_string_lossy().to_string()),
+                        path: relative_path,
                     });
                 } else {
                     let extension = entry_path
@@ -230,7 +235,7 @@ This file tracks decisions, discussions, and important changes.
                         extension,
                         children: None,
                         summary: None,
-                        path: Some(entry_path.to_string_lossy().to_string()),
+                        path: relative_path,
                     });
                 }
             }

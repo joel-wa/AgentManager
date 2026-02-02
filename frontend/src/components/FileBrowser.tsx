@@ -84,10 +84,15 @@ export function FileBrowser({ projectId, onFileSelect }: Props) {
       const files = await api.listFiles(projectId)
       if (files && files.length > 0) {
         setFileTree(convertApiFiles(files))
+      } else {
+        // Empty project - clear mock data
+        setFileTree([])
       }
     } catch (err) {
-      console.warn('Using mock file tree - backend not available')
-      // Keep mock data on error
+      const errorMessage = err instanceof Error ? err.message : 'Backend not available'
+      console.error('Failed to load files:', errorMessage)
+      setError(errorMessage)
+      // Keep mock data on error for demo purposes
     } finally {
       setIsLoading(false)
     }

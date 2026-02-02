@@ -11,6 +11,7 @@ import uvicorn
 from datetime import datetime
 import uuid
 import json
+import os
 
 from ollama_client import OllamaClient
 from tool_logic import ToolExecutor

@@ -70,6 +70,9 @@ The system consists of three main components:
 3. **Build Rust Core**
    ```bash
    cd rust-core
+   # For development (faster builds):
+   cargo build
+   # For production (optimized):
    cargo build --release
    ```
 
@@ -109,6 +112,9 @@ The system consists of three main components:
 3. **Start Rust Core**
    ```bash
    cd rust-core
+   # Development mode (faster startup):
+   cargo run
+   # Production mode (optimized):
    cargo run --release
    ```
 
