@@ -333,8 +333,9 @@ Always be helpful, concise, and accurate.
     if project_working_dir:
         base_prompt += f"""# WORKSPACE CONTEXT
 Your current working directory is: {project_working_dir}
-All file operations (read, write, list) should use paths relative to this directory.
-For example, if you want to read "notes/meeting.md", use path "notes/meeting.md" not an absolute path.
+You can use either relative or absolute paths for file operations:
+- Relative paths (recommended): "notes/meeting.md" - automatically resolved from the project directory
+- Absolute paths: "{project_working_dir}/notes/meeting.md" - also supported
 
 """
 

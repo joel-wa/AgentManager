@@ -793,12 +793,17 @@ class ToolExecutor:
             )
         
         # Resolve paths in arguments relative to working directory
+        # Handle multiple path argument names used by different tools
         resolved_args = dict(arguments)
-        if 'path' in resolved_args and self._working_directory:
-            resolved_args['path'] = self._resolve_path(resolved_args['path'])
-        if 'working_directory' not in resolved_args and self._working_directory:
+        path_arg_names = ['path', 'source_path', 'destination_path', 'file_path', 'directory']
+        
+        if self._working_directory:
+            for arg_name in path_arg_names:
+                if arg_name in resolved_args:
+                    resolved_args[arg_name] = self._resolve_path(resolved_args[arg_name])
+            
             # Default working directory for execute_command
-            if tool_name == 'execute_command':
+            if tool_name == 'execute_command' and 'working_directory' not in resolved_args:
                 resolved_args['working_directory'] = self._working_directory
         
         try:
