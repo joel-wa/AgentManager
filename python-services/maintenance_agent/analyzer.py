@@ -86,6 +86,12 @@ class WorkspaceAnalyzer:
             if not name and "path" in file:
                 name = file["path"].split("/")[-1]
             
+            # Get full path (prefer path field, fallback to name)
+            path = file.get("path", name)
+            
+            # DEBUG: Log what we're storing
+            print(f"DEBUG: name={name}, path={path}, file={file}")
+            
             # Extract base name without extension
             base = name.rsplit(".", 1)[0].lower()
             
@@ -93,12 +99,13 @@ class WorkspaceAnalyzer:
             for suffix in ["_v1", "_v2", "_old", "_new", "_backup", "_copy"]:
                 base = base.replace(suffix, "")
             
-            seen_patterns[base].append(name)
+            seen_patterns[base].append(path)  # Store full path instead of just name
         
         # Return groups with multiple files
-        for pattern, names in seen_patterns.items():
-            if len(names) > 1:
-                duplicates.append(names)
+        for pattern, paths in seen_patterns.items():
+            if len(paths) > 1:
+                print(f"DEBUG: Found duplicates - pattern={pattern}, paths={paths}")
+                duplicates.append(paths)
         
         return duplicates
     

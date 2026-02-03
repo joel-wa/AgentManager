@@ -22,13 +22,21 @@ class SuggestionExecutor:
             # Try to get from environment, fall back to relative path
             projects_root = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(os.path.dirname(__file__), "..", "..", "workspace", "projects")
         self.projects_root = projects_root
+        self.current_workspace = None  # Will be set when executing
     
     async def execute(
         self,
         suggestion: Suggestion,
-        project_id: str
+        project_id: str,
+        workspace_path: str = None
     ) -> ExecutionResult:
         """Execute a suggestion and return result"""
+        # Use provided workspace_path if given
+        if workspace_path:
+            self.current_workspace = workspace_path
+        else:
+            self.current_workspace = os.path.join(self.projects_root, project_id)
+        
         try:
             if suggestion.type == "merge":
                 return await self._execute_merge(suggestion, project_id)
@@ -151,7 +159,7 @@ Return ONLY the merged content, no explanations."""
     async def _read_file(self, project_id: str, file_path: str) -> Optional[str]:
         """Read file content"""
         try:
-            full_path = os.path.join(self.projects_root, project_id, file_path)
+            full_path = os.path.join(self.current_workspace, file_path)
             if os.path.exists(full_path):
                 with open(full_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -162,7 +170,7 @@ Return ONLY the merged content, no explanations."""
     async def _write_file(self, project_id: str, file_path: str, content: str):
         """Write file content"""
         try:
-            full_path = os.path.join(self.projects_root, project_id, file_path)
+            full_path = os.path.join(self.current_workspace, file_path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, 'w', encoding='utf-8') as f:
                 f.write(content)
@@ -172,10 +180,9 @@ Return ONLY the merged content, no explanations."""
     async def _archive_file(self, project_id: str, file_path: str) -> bool:
         """Archive a file to .archive folder"""
         try:
-            full_path = os.path.join(self.projects_root, project_id, file_path)
+            full_path = os.path.join(self.current_workspace, file_path)
             archive_path = os.path.join(
-                self.projects_root, 
-                project_id, 
+                self.current_workspace, 
                 ".archive",
                 file_path
             )

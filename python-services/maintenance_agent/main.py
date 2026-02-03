@@ -48,6 +48,7 @@ app.add_middleware(
 cloud_client = CloudClient()
 analyzer = WorkspaceAnalyzer()
 summarizer = ContentSummarizer(cloud_client)
+project_paths = {}  # Store project_id -> workspace_path mapping
 context_tracker = ConversationContext()
 suggestion_store = SuggestionStore()
 recents_updater = RecentsUpdater()
@@ -245,10 +246,16 @@ async def accept_suggestion(suggestion_id: str):
         if not suggestion:
             raise HTTPException(status_code=404, detail="Suggestion not found")
         
+        # Get workspace path for this project
+        workspace_path = project_paths.get(suggestion.project_id)
+        if not workspace_path:
+            raise HTTPException(status_code=400, detail="Project workspace path not found. Please trigger analysis first.")
+        
         # Execute
         result = await suggestion_executor.execute(
             suggestion,
-            suggestion.project_id
+            suggestion.project_id,
+            workspace_path
         )
         
         # Update status
@@ -297,6 +304,9 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
         # Get project files from file system
         import os
         project_path = request.workspace_path
+        
+        # Store workspace path for later use
+        project_paths[project_id] = project_path
         
         files = []
         if os.path.exists(project_path):
