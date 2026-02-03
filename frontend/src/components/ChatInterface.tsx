@@ -258,11 +258,13 @@ function MessageBubble({ message }: { message: Message }) {
                   td: ({node, ...props}) => (
                     <td className="border border-gray-600 px-4 py-2" {...props} />
                   ),
-                  code: ({node, inline, ...props}: any) => (
-                    inline ? 
-                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} /> :
-                      <code className="block bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
-                  ),
+                  code: ({node, className, children, ...props}) => {
+                    const match = /language-(\w+)/.exec(className || '')
+                    const isInline = !match
+                    return isInline ? 
+                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code> :
+                      <code className="block bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props}>{children}</code>
+                  },
                   pre: ({node, ...props}) => (
                     <pre className="bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
                   ),
