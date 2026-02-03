@@ -90,3 +90,7 @@ class FileChangeEvent(BaseModel):
     project_id: str
     file_path: str
     change_type: str  # created, modified, deleted
+    workspace_path: Optional[str] = None
+    file_content: Optional[str] = None
+    readme_content: Optional[str] = None
+    workspace_structure: Optional[Dict[str, List[str]]] = None

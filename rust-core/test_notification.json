@@ -1,0 +1,6 @@
+﻿{
+    "project_id": "8e6f3a02-b81c-4cd7-abba-e193b0ad1245",
+    "file_path": "test_feature.py",
+    "change_type": "created",
+    "file_content": "def calculate_sum(a, b):\n    return a + b"
+}

@@ -1,0 +1,12 @@
+{
+  "project_id": "8e6f3a02-b81c-4cd7-abba-e193b0ad1245",
+  "file_path": "test_feature.py",
+  "change_type": "created",
+  "workspace_path": "C:\\Users\\RanVic\\.agent-workspace\\projects\\8e6f3a02-b81c-4cd7-abba-e193b0ad1245",
+  "file_content": "def calculate_sum(a, b):\n    return a + b\n\ndef calculate_product(a, b):\n    return a * b",
+  "readme_content": "# Test Project\n\nThis is a test project.",
+  "workspace_structure": {
+    "files": ["README.md", "test_feature.py", "data.json"],
+    "folders": ["docs", "src"]
+  }
+}

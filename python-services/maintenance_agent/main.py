@@ -200,16 +200,24 @@ async def handle_file_change(request: FileChangeEvent):
     """Called when file changes detected"""
     try:
         logger.info(f"File change detected: {request.file_path} ({request.change_type}) in project {request.project_id}")
+        logger.info(f"Context: {len(request.workspace_structure.get('files', []) if request.workspace_structure else [])} files, README: {bool(request.readme_content)}")
+        
         await file_monitor.handle_file_change(
             request.project_id,
             request.file_path,
-            request.change_type
+            request.change_type,
+            request.workspace_path,
+            request.file_content,
+            request.readme_content,
+            request.workspace_structure
         )
         logger.info(f"File change processed successfully for {request.file_path}")
         return {"status": "processing"}
     except Exception as e:
         # Don't fail - maintenance is non-critical
         logger.error(f"Error in file change handler: {e}")
+        import traceback
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 

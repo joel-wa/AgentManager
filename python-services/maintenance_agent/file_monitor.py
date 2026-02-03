@@ -39,7 +39,11 @@ class FileChangeMonitor:
         self,
         project_id: str,
         file_path: str,
-        change_type: str  # created, modified, deleted
+        change_type: str,  # created, modified, deleted
+        workspace_path: Optional[str] = None,
+        file_content: Optional[str] = None,
+        readme_content: Optional[str] = None,
+        workspace_structure: Optional[dict] = None
     ):
         """Main handler for file change events"""
         try:
@@ -48,9 +52,10 @@ class FileChangeMonitor:
                 project_id, file_path, change_type
             )
             
-            # 2. Analyze change impact
+            # 2. Analyze change impact with full context
             impact = await self._analyze_change_impact(
-                project_id, file_path, change_type, context
+                project_id, file_path, change_type, context,
+                file_content, readme_content, workspace_structure
             )
             
             # 3. Update Recents.md if significant
@@ -59,9 +64,10 @@ class FileChangeMonitor:
                     project_id, file_path, context, impact
                 )
             
-            # 4. Check for maintenance opportunities
+            # 4. Check for maintenance opportunities with enhanced context
             suggestions = await self._generate_suggestions_from_change(
-                project_id, file_path, context, impact
+                project_id, file_path, change_type, context, impact,
+                file_content, readme_content, workspace_structure
             )
             
             # 5. Queue suggestions for user
@@ -76,16 +82,34 @@ class FileChangeMonitor:
         project_id: str,
         file_path: str,
         change_type: str,
-        context: ContextSnapshot
+        context: ContextSnapshot,
+        file_content: Optional[str] = None,
+        readme_content: Optional[str] = None,
+        workspace_structure: Optional[dict] = None
     ) -> Optional[ChangeImpact]:
         """Determine significance of the change"""
         try:
+            # Build enhanced context
+            content_preview = ""
+            if file_content:
+                content_preview = f"\nFile Content (first 500 chars):\n{file_content[:500]}"
+            
+            structure_info = ""
+            if workspace_structure:
+                files = workspace_structure.get('files', [])
+                folders = workspace_structure.get('folders', [])
+                structure_info = f"\nWorkspace Structure:\n- Folders: {', '.join(folders[:10])}\n- Files: {', '.join(files[:10])}"
+            
+            readme_info = ""
+            if readme_content:
+                readme_info = f"\nCurrent README (first 300 chars):\n{readme_content[:300]}"
+            
             prompt = f"""Analyze this file change and return a JSON object:
 
 File: {file_path}
 Change Type: {change_type}
 Recent Conversation: {context.conversation_summary}
-Key Decisions: {', '.join(context.key_decisions) if context.key_decisions else 'None'}
+Key Decisions: {', '.join(context.key_decisions) if context.key_decisions else 'None'}{content_preview}{structure_info}{readme_info}
 
 Rate significance (0.0-1.0) and provide:
 1. title: Short title for this change
@@ -144,29 +168,88 @@ Return ONLY valid JSON in this exact format:
         self,
         project_id: str,
         file_path: str,
+        change_type: str,
         context: ContextSnapshot,
-        impact: Optional[ChangeImpact]
+        impact: Optional[ChangeImpact],
+        file_content: Optional[str] = None,
+        readme_content: Optional[str] = None,
+        workspace_structure: Optional[dict] = None
     ) -> list[Suggestion]:
         """Generate maintenance suggestions based on file change"""
         suggestions = []
         
         try:
-            # Check for similar files that might need updates
-            similar_files = await self._find_similar_files(project_id, file_path)
+            # Build context for AI
+            content_preview = ""
+            if file_content:
+                content_preview = f"\nChanged File Content:\n{file_content[:1000]}"
             
-            if similar_files and len(similar_files) > 0:
+            structure_info = ""
+            if workspace_structure:
+                files = workspace_structure.get('files', [])
+                folders = workspace_structure.get('folders', [])
+                structure_info = f"\nWorkspace:\n- Folders: {', '.join(folders)}\n- Files: {', '.join(files)}"
+            
+            readme_info = ""
+            if readme_content:
+                readme_info = f"\nCurrent README:\n{readme_content[:500]}"
+            
+            # Ask AI for suggestions
+            prompt = f"""Analyze this file change and suggest maintenance actions:
+
+File Changed: {file_path}
+Change Type: {change_type}{content_preview}{structure_info}{readme_info}
+
+Suggest up to 3 maintenance actions from:
+1. Update README - if the change should be reflected in project documentation
+2. Move file - if the file would fit better in a different folder
+3. Merge files - if this file is similar to existing files
+4. Update other files - if related files need corresponding changes
+
+Return ONLY valid JSON array:
+[
+  {{
+    "type": "update|move|merge",
+    "title": "Short title",
+    "description": "Detailed explanation",
+    "affected_files": ["file1.txt", "file2.txt"],
+    "priority": "high|medium|low"
+  }}
+]"""
+            
+            response = await self.cloud_client.generate(
+                prompt,
+                system="You are a workspace organization expert. Return valid JSON array only."
+            )
+            
+            # Parse suggestions
+            response_clean = response.strip()
+            if response_clean.startswith('```json'):
+                response_clean = response_clean[7:]
+            if response_clean.startswith('```'):
+                response_clean = response_clean[3:]
+            if response_clean.endswith('```'):
+                response_clean = response_clean[:-3]
+            
+            import json
+            suggestions_data = json.loads(response_clean.strip())
+            
+            # Convert to Suggestion objects
+            for s in suggestions_data:
                 suggestions.append(Suggestion(
                     id=str(uuid.uuid4()),
                     project_id=project_id,
-                    type="update",
-                    title=f"Similar files may need updates",
-                    description=f"File {file_path} was changed. Consider updating related files: {', '.join(similar_files[:3])}",
-                    affected_files=similar_files,
-                    priority="low"
+                    type=s.get('type', 'update'),
+                    title=s.get('title', 'Maintenance suggestion'),
+                    description=s.get('description', ''),
+                    affected_files=s.get('affected_files', [file_path]),
+                    priority=s.get('priority', 'medium')
                 ))
         
         except Exception as e:
             print(f"Error generating suggestions: {e}")
+            import traceback
+            traceback.print_exc()
         
         return suggestions
     

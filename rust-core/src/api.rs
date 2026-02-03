@@ -295,14 +295,66 @@ async fn notify_file_change(
     change_type: &str
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
+    
+    // Get workspace path
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_else(|_| ".".to_string());
+    let workspace_path = format!("{}/.agent-workspace/projects/{}", home, project_id);
+    
+    // Gather workspace context
+    let mut files = Vec::new();
+    let mut folders = Vec::new();
+    let mut readme_content = None;
+    let mut file_content = None;
+    
+    // Read file content if it's a text file
+    let full_file_path = format!("{}/{}", workspace_path, file_path);
+    if let Ok(content) = tokio::fs::read_to_string(&full_file_path).await {
+        file_content = Some(content);
+    }
+    
+    // Read README if it exists
+    let readme_path = format!("{}/README.md", workspace_path);
+    if let Ok(content) = tokio::fs::read_to_string(&readme_path).await {
+        readme_content = Some(content);
+    }
+    
+    // Scan workspace structure
+    if let Ok(mut entries) = tokio::fs::read_dir(&workspace_path).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Ok(file_type) = entry.file_type().await {
+                let name = entry.file_name().to_string_lossy().to_string();
+                
+                // Skip hidden files/folders
+                if name.starts_with('.') {
+                    continue;
+                }
+                
+                if file_type.is_dir() {
+                    folders.push(name);
+                } else {
+                    files.push(name);
+                }
+            }
+        }
+    }
+    
     let _ = client
         .post("http://localhost:8002/maintenance/file-change")
         .json(&serde_json::json!({
             "project_id": project_id,
             "file_path": file_path,
-            "change_type": change_type
+            "change_type": change_type,
+            "workspace_path": workspace_path,
+            "file_content": file_content,
+            "readme_content": readme_content,
+            "workspace_structure": {
+                "files": files,
+                "folders": folders
+            }
         }))
-        .timeout(std::time::Duration::from_secs(2))
+        .timeout(std::time::Duration::from_secs(5))
         .send()
         .await;
     Ok(())
