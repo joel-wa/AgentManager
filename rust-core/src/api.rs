@@ -274,9 +274,38 @@ pub async fn write_file(
 ) -> Result<StatusCode, StatusCode> {
     let state = state.read().await;
     match state.workspace.write_file(&id, &path, &body) {
-        Ok(_) => Ok(StatusCode::OK),
+        Ok(_) => {
+            // Notify maintenance agent of file change (non-blocking)
+            let project_id = id.clone();
+            let file_path = path.clone();
+            tokio::spawn(async move {
+                let _ = notify_file_change(&project_id, &file_path, "modified").await;
+            });
+            
+            Ok(StatusCode::OK)
+        }
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
+}
+
+/// Notify maintenance agent of file change (best effort, non-blocking)
+async fn notify_file_change(
+    project_id: &str,
+    file_path: &str,
+    change_type: &str
+) -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let _ = client
+        .post("http://localhost:8004/maintenance/file-change")
+        .json(&serde_json::json!({
+            "project_id": project_id,
+            "file_path": file_path,
+            "change_type": change_type
+        }))
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await;
+    Ok(())
 }
 
 /// Get project timeline

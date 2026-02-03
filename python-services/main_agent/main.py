@@ -14,6 +14,7 @@ import uuid
 import json
 import os
 import asyncio
+import httpx
 
 from ollama_client import OllamaClient
 from tool_logic import ToolExecutor
@@ -154,6 +155,14 @@ async def chat(request: ChatRequest):
             "content": request.message
         })
         
+        # Track user message with maintenance agent
+        if request.project_id:
+            await track_with_maintenance_agent(
+                request.project_id,
+                "user",
+                request.message
+            )
+        
         # Agentic loop: allow agent to see results and iterate
         max_iterations = 15  # Increased limit to allow more complex tasks
         all_tool_calls = []
@@ -270,6 +279,14 @@ async def chat(request: ChatRequest):
         print(f"\n[AGENTIC LOOP] Completed. Total iterations: {iteration + 1}")
         print(f"[AGENTIC LOOP] Total tool calls: {len(all_tool_calls)}")
         print(f"[AGENTIC LOOP] Final response length: {len(final_response)} chars\n")
+        
+        # Track assistant response with maintenance agent
+        if request.project_id and final_response:
+            await track_with_maintenance_agent(
+                request.project_id,
+                "assistant",
+                final_response
+            )
         
         return ChatResponse(
             response=final_response,
@@ -510,6 +527,27 @@ Rule: Need info? → Output pure JSON. Have info? → Answer normally.
             base_prompt += f"Parameters:\n```json\n{json.dumps(tool['parameters'], indent=2)}\n```\n\n"
     
     return base_prompt
+
+
+async def track_with_maintenance_agent(
+    project_id: str,
+    role: str,
+    content: str
+):
+    """Send message to maintenance agent for context tracking"""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "http://localhost:8004/maintenance/context/message",
+                json={
+                    "project_id": project_id,
+                    "role": role,
+                    "content": content
+                },
+                timeout=2.0  # Don't wait long
+            )
+    except:
+        pass  # Don't fail if maintenance agent down
 
 
 if __name__ == "__main__":

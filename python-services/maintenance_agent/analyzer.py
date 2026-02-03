@@ -3,29 +3,35 @@ Workspace Analyzer
 Analyzes workspace structure and content for maintenance opportunities
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from collections import defaultdict
 import hashlib
+import httpx
+
+from models import ContextSnapshot, DuplicateGroup, FileCluster, OutdatedItem
 
 
 class WorkspaceAnalyzer:
     """Analyzes workspace for maintenance suggestions"""
     
-    def __init__(self):
+    def __init__(self, embeddings_url: str = "http://localhost:8003"):
         self.similarity_threshold = 0.7
+        self.embeddings_url = embeddings_url
     
     async def analyze(
         self, 
         project_id: str,
-        files: List[Dict[str, Any]]
+        files: List[Dict[str, Any]],
+        context: Optional[ContextSnapshot] = None
     ) -> Dict[str, Any]:
         """
-        Analyze workspace and return analysis results
+        Analyze workspace and return analysis results with semantic understanding
         """
         result = {
             "project_id": project_id,
             "health_score": 1.0,
             "duplicates": [],
+            "semantic_clusters": [],
             "outdated": [],
             "improvements": [],
             "stats": {
@@ -41,6 +47,22 @@ class WorkspaceAnalyzer:
         
         # Find potential duplicates (by name similarity)
         result["duplicates"] = self._find_duplicates(files)
+        
+        # Try semantic duplicate detection via embeddings service
+        try:
+            semantic_duplicates = await self._find_semantic_duplicates(project_id)
+            if semantic_duplicates:
+                result["duplicates"].extend(semantic_duplicates)
+        except:
+            pass  # Fall back to basic detection
+        
+        # Try semantic clustering
+        try:
+            clusters = await self._cluster_related_files(project_id)
+            if clusters:
+                result["semantic_clusters"] = clusters
+        except:
+            pass
         
         # Find potentially outdated content
         result["outdated"] = self._find_outdated(files)
@@ -137,3 +159,58 @@ class WorkspaceAnalyzer:
             })
         
         return improvements
+    
+    async def _find_semantic_duplicates(
+        self,
+        project_id: str
+    ) -> List[List[str]]:
+        """Find semantically similar files using embeddings service"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.embeddings_url}/semantic/similar",
+                    json={
+                        "project_id": project_id,
+                        "threshold": self.similarity_threshold
+                    },
+                    timeout=5.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    similar_pairs = data.get("similar_pairs", [])
+                    
+                    # Group pairs into clusters
+                    clusters = []
+                    for pair in similar_pairs:
+                        clusters.append([pair.get("file1"), pair.get("file2")])
+                    
+                    return clusters
+        except:
+            pass
+        
+        return []
+    
+    async def _cluster_related_files(
+        self,
+        project_id: str
+    ) -> List[Dict[str, Any]]:
+        """Group files by semantic similarity"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.embeddings_url}/semantic/cluster",
+                    json={
+                        "project_id": project_id,
+                        "num_clusters": "auto"
+                    },
+                    timeout=5.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("clusters", [])
+        except:
+            pass
+        
+        return []

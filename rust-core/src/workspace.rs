@@ -216,8 +216,8 @@ This file tracks decisions, discussions, and important changes.
                 let entry_path = entry.path();
                 let name = entry.file_name().to_string_lossy().to_string();
                 
-                // Skip hidden files and .meta directory
-                if name.starts_with('.') {
+                // Skip hidden files EXCEPT .meta directory
+                if name.starts_with('.') && name != ".meta" {
                     continue;
                 }
                 

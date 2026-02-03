@@ -14,6 +14,12 @@ import uuid
 from cloud_client import CloudClient
 from analyzer import WorkspaceAnalyzer
 from summarizer import ContentSummarizer
+from context_tracker import ConversationContext
+from file_monitor import FileChangeMonitor
+from suggestion_store import SuggestionStore
+from recents_updater import RecentsUpdater
+from suggestion_executor import SuggestionExecutor
+from models import Message, MessageContext, FileChangeEvent, Suggestion as SuggestionModel
 
 app = FastAPI(
     title="Maintenance Agent Service",
@@ -34,6 +40,17 @@ app.add_middleware(
 cloud_client = CloudClient()
 analyzer = WorkspaceAnalyzer()
 summarizer = ContentSummarizer(cloud_client)
+context_tracker = ConversationContext()
+suggestion_store = SuggestionStore()
+recents_updater = RecentsUpdater()
+suggestion_executor = SuggestionExecutor(cloud_client)
+file_monitor = FileChangeMonitor(
+    context_tracker=context_tracker,
+    analyzer=analyzer,
+    cloud_client=cloud_client,
+    suggestion_store=suggestion_store,
+    recents_updater=recents_updater
+)
 
 
 class AnalyzeRequest(BaseModel):
@@ -148,6 +165,110 @@ async def update_readme(project_id: str, context: Dict[str, Any]):
 async def shutdown():
     """Graceful shutdown endpoint"""
     return {"status": "shutting_down"}
+
+
+@app.post("/maintenance/context/message")
+async def track_message(request: MessageContext):
+    """Called by main agent after each message"""
+    try:
+        context_tracker.add_message(
+            request.project_id,
+            Message(
+                role=request.role,
+                content=request.content,
+                timestamp=datetime.utcnow()
+            )
+        )
+        return {"status": "tracked"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/maintenance/file-change")
+async def handle_file_change(request: FileChangeEvent):
+    """Called when file changes detected"""
+    try:
+        await file_monitor.handle_file_change(
+            request.project_id,
+            request.file_path,
+            request.change_type
+        )
+        return {"status": "processing"}
+    except Exception as e:
+        # Don't fail - maintenance is non-critical
+        print(f"Error in file change handler: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/maintenance/suggestions/{project_id}")
+async def get_suggestions(project_id: str):
+    """Get pending suggestions for a project"""
+    try:
+        suggestions = suggestion_store.get_pending_suggestions(project_id)
+        return {
+            "suggestions": [
+                {
+                    "id": s.id,
+                    "type": s.type,
+                    "title": s.title,
+                    "description": s.description,
+                    "affected_files": s.affected_files,
+                    "priority": s.priority,
+                    "status": s.status,
+                    "created_at": s.created_at.isoformat()
+                }
+                for s in suggestions
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/maintenance/suggestions/{suggestion_id}/accept")
+async def accept_suggestion(suggestion_id: str):
+    """Accept and execute suggestion"""
+    try:
+        suggestion = suggestion_store.get_by_id(suggestion_id)
+        
+        if not suggestion:
+            raise HTTPException(status_code=404, detail="Suggestion not found")
+        
+        # Execute
+        result = await suggestion_executor.execute(
+            suggestion,
+            suggestion.project_id
+        )
+        
+        # Update status
+        if result.success:
+            suggestion_store.update_status(suggestion_id, "applied")
+        
+        return {
+            "success": result.success,
+            "changes": result.changes,
+            "error": result.error
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/maintenance/suggestions/{suggestion_id}/dismiss")
+async def dismiss_suggestion(suggestion_id: str):
+    """Dismiss suggestion"""
+    try:
+        suggestion = suggestion_store.get_by_id(suggestion_id)
+        
+        if not suggestion:
+            raise HTTPException(status_code=404, detail="Suggestion not found")
+        
+        suggestion_store.update_status(suggestion_id, "dismissed")
+        return {"status": "dismissed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def generate_suggestions(analysis: Dict[str, Any]) -> List[Suggestion]:
