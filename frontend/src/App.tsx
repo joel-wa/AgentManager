@@ -7,6 +7,7 @@ import { TopBar } from './components/TopBar'
 import { NewProjectModal } from './components/NewProjectModal'
 import { FileViewer } from './components/FileViewer'
 import { SettingsModal } from './components/SettingsModal'
+import { ChatTabs, ChatTab } from './components/ChatTabs'
 import { api } from './services/api'
 import { 
   FolderTree, 
@@ -61,7 +62,14 @@ function App() {
   const [projects, setProjects] = useState<Project[]>([])
   const [availableFiles, setAvailableFiles] = useState<string[]>([])
   
-  const [messages, setMessages] = useState<Message[]>([
+  // Chat tabs state
+  const [chatTabs, setChatTabs] = useState<ChatTab[]>([])
+  const [activeTabId, setActiveTabId] = useState<string>('')
+  
+  // Store messages per tab
+  const [tabMessages, setTabMessages] = useState<Record<string, Message[]>>({})
+  
+  const messages = tabMessages[activeTabId] || [
     {
       id: '1',
       role: 'assistant',
@@ -69,7 +77,7 @@ function App() {
       timestamp: new Date(),
       toolActivity: []
     }
-  ])
+  ]
   
   const [sidePanel, setSidePanel] = useState<SidePanel>('files')
   const [showSidePanel, setShowSidePanel] = useState(true)
@@ -129,12 +137,81 @@ function App() {
     loadProjects()
   }, [])
 
+  // Initialize first tab when project is set
+  useEffect(() => {
+    if (currentProject && chatTabs.length === 0) {
+      createNewTab()
+    }
+  }, [currentProject, chatTabs.length])
+
   // Load available files when project changes
   useEffect(() => {
     if (currentProject) {
       loadAvailableFiles()
     }
   }, [currentProject])
+
+  const createNewTab = () => {
+    if (!currentProject) return
+    
+    const newTab: ChatTab = {
+      id: `tab-${Date.now()}`,
+      projectId: currentProject.id,
+      projectName: currentProject.name,
+      title: 'New Chat',
+      timestamp: new Date()
+    }
+    
+    setChatTabs(prev => [...prev, newTab])
+    setActiveTabId(newTab.id)
+    
+    // Initialize messages for new tab
+    setTabMessages(prev => ({
+      ...prev,
+      [newTab.id]: [{
+        id: '1',
+        role: 'assistant',
+        content: `Welcome to ${currentProject.name}! How can I help you today?`,
+        timestamp: new Date(),
+        toolActivity: []
+      }]
+    }))
+  }
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTabId(tabId)
+    const tab = chatTabs.find(t => t.id === tabId)
+    if (tab) {
+      const project = projects.find(p => p.id === tab.projectId)
+      if (project) {
+        setCurrentProject(project)
+      }
+    }
+  }
+
+  const handleTabClose = (tabId: string) => {
+    const newTabs = chatTabs.filter(t => t.id !== tabId)
+    setChatTabs(newTabs)
+    
+    // Remove messages for closed tab
+    setTabMessages(prev => {
+      const updated = { ...prev }
+      delete updated[tabId]
+      return updated
+    })
+    
+    // Switch to another tab if closing active tab
+    if (tabId === activeTabId && newTabs.length > 0) {
+      setActiveTabId(newTabs[0].id)
+    }
+  }
+
+  const setMessages = (updater: (prev: Message[]) => Message[]) => {
+    setTabMessages(prev => ({
+      ...prev,
+      [activeTabId]: updater(prev[activeTabId] || [])
+    }))
+  }
 
   const checkHealth = async () => {
     try {
@@ -355,6 +432,29 @@ function App() {
       }
       setProjects(prev => [...prev, newProject])
       setCurrentProject(newProject)
+      
+      // Create initial tab for new project
+      const newTab: ChatTab = {
+        id: `tab-${Date.now()}`,
+        projectId: newProject.id,
+        projectName: newProject.name,
+        title: 'New Chat',
+        timestamp: new Date()
+      }
+      
+      setChatTabs([newTab])
+      setActiveTabId(newTab.id)
+      
+      // Initialize messages for new tab
+      setTabMessages({
+        [newTab.id]: [{
+          id: '1',
+          role: 'assistant',
+          content: `Welcome to your new project "${name}"! I'm ready to help you organize and explore your workspace. What would you like to start with?`,
+          timestamp: new Date(),
+          toolActivity: []
+        }]
+      })
     } catch {
       // Fallback to local creation
       const newProject: Project = {
@@ -366,26 +466,59 @@ function App() {
       }
       setProjects(prev => [...prev, newProject])
       setCurrentProject(newProject)
+      
+      // Create initial tab for new project
+      const newTab: ChatTab = {
+        id: `tab-${Date.now()}`,
+        projectId: newProject.id,
+        projectName: newProject.name,
+        title: 'New Chat',
+        timestamp: new Date()
+      }
+      
+      setChatTabs([newTab])
+      setActiveTabId(newTab.id)
+      
+      // Initialize messages for new tab
+      setTabMessages({
+        [newTab.id]: [{
+          id: '1',
+          role: 'assistant',
+          content: `Welcome to your new project "${name}"! I'm ready to help you organize and explore your workspace. What would you like to start with?`,
+          timestamp: new Date(),
+          toolActivity: []
+        }]
+      })
     }
     
     setShowNewProjectModal(false)
-    setMessages([{
-      id: '1',
-      role: 'assistant',
-      content: `Welcome to your new project "${name}"! I'm ready to help you organize and explore your workspace. What would you like to start with?`,
-      timestamp: new Date()
-    }])
   }
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project)
-    // Reset chat when switching projects
-    setMessages([{
-      id: '1',
-      role: 'assistant',
-      content: `Switched to project "${project.name}". How can I help you today?`,
+    // Create new tab for this project
+    const newTab: ChatTab = {
+      id: `tab-${Date.now()}`,
+      projectId: project.id,
+      projectName: project.name,
+      title: 'New Chat',
       timestamp: new Date()
-    }])
+    }
+    
+    setChatTabs(prev => [...prev, newTab])
+    setActiveTabId(newTab.id)
+    
+    // Initialize messages for new tab
+    setTabMessages(prev => ({
+      ...prev,
+      [newTab.id]: [{
+        id: '1',
+        role: 'assistant',
+        content: `Switched to project "${project.name}". How can I help you today?`,
+        timestamp: new Date(),
+        toolActivity: []
+      }]
+    }))
   }
 
   const handleFileSelect = async (file: FileItem, fullPath: string) => {
@@ -439,6 +572,17 @@ function App() {
         onSettingsClick={() => setShowSettingsModal(true)}
         suggestionCount={suggestions.length}
       />
+      
+      {/* Chat Tabs */}
+      {chatTabs.length > 0 && (
+        <ChatTabs
+          tabs={chatTabs}
+          activeTabId={activeTabId}
+          onTabChange={handleTabChange}
+          onTabClose={handleTabClose}
+          onNewTab={createNewTab}
+        />
+      )}
       
       <div className="flex-1 flex overflow-hidden">
         {/* Main Chat Area */}
