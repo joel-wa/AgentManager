@@ -10,6 +10,14 @@ from typing import Optional, List, Dict, Any
 import uvicorn
 from datetime import datetime
 import uuid
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 from cloud_client import CloudClient
 from analyzer import WorkspaceAnalyzer
@@ -171,6 +179,7 @@ async def shutdown():
 async def track_message(request: MessageContext):
     """Called by main agent after each message"""
     try:
+        logger.info(f"Tracking message for project {request.project_id}: {request.role}")
         context_tracker.add_message(
             request.project_id,
             Message(
@@ -181,6 +190,7 @@ async def track_message(request: MessageContext):
         )
         return {"status": "tracked"}
     except Exception as e:
+        logger.error(f"Error tracking message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -188,15 +198,17 @@ async def track_message(request: MessageContext):
 async def handle_file_change(request: FileChangeEvent):
     """Called when file changes detected"""
     try:
+        logger.info(f"File change detected: {request.file_path} ({request.change_type}) in project {request.project_id}")
         await file_monitor.handle_file_change(
             request.project_id,
             request.file_path,
             request.change_type
         )
+        logger.info(f"File change processed successfully for {request.file_path}")
         return {"status": "processing"}
     except Exception as e:
         # Don't fail - maintenance is non-critical
-        print(f"Error in file change handler: {e}")
+        logger.error(f"Error in file change handler: {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -264,10 +276,79 @@ async def dismiss_suggestion(suggestion_id: str):
             raise HTTPException(status_code=404, detail="Suggestion not found")
         
         suggestion_store.update_status(suggestion_id, "dismissed")
+        logger.info(f"Dismissed suggestion {suggestion_id}")
         return {"status": "dismissed"}
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/maintenance/trigger/{project_id}")
+async def trigger_maintenance(project_id: str):
+    """Manually trigger full maintenance analysis for a project"""
+    try:
+        logger.info(f"Manual maintenance trigger for project {project_id}")
+        
+        # Get project files from file system
+        import os
+        project_path = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(
+            os.path.dirname(__file__), "..", "..", "workspace", "projects", project_id
+        )
+        
+        files = []
+        if os.path.exists(project_path):
+            for root, dirs, filenames in os.walk(project_path):
+                # Skip .meta and other hidden directories
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                
+                for filename in filenames:
+                    if not filename.startswith('.'):
+                        rel_path = os.path.relpath(os.path.join(root, filename), project_path)
+                        ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
+                        files.append({
+                            "name": filename,
+                            "path": rel_path,
+                            "extension": ext
+                        })
+        
+        logger.info(f"Found {len(files)} files for analysis")
+        
+        # Run analysis
+        analysis_result = await analyzer.analyze(
+            project_id=project_id,
+            files=files
+        )
+        
+        # Generate suggestions
+        suggestions = await generate_suggestions(analysis_result)
+        
+        # Save suggestions
+        for suggestion in suggestions:
+            # Convert to SuggestionModel
+            sug_model = SuggestionModel(
+                id=suggestion.id,
+                project_id=project_id,
+                type=suggestion.type,
+                title=suggestion.title,
+                description=suggestion.description,
+                affected_files=suggestion.affected_files,
+                priority=suggestion.priority,
+                status="pending"
+            )
+            suggestion_store.save_suggestion(sug_model)
+        
+        logger.info(f"Generated {len(suggestions)} suggestions")
+        
+        return {
+            "status": "completed",
+            "health_score": analysis_result.get("health_score", 0.8),
+            "suggestions_generated": len(suggestions),
+            "files_analyzed": len(files)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error triggering maintenance: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

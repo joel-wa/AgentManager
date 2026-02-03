@@ -1,13 +1,28 @@
-import { Lightbulb, AlertTriangle, Sparkles, GitMerge, Check, X } from 'lucide-react'
+import { Lightbulb, AlertTriangle, Sparkles, GitMerge, Check, X, RefreshCw } from 'lucide-react'
 import type { Suggestion } from '../App'
+import { useState } from 'react'
 
 type Props = {
   suggestions: Suggestion[]
   onAccept: (id: string) => void
   onDismiss: (id: string) => void
+  onTrigger?: () => Promise<void>
+  projectId?: string
 }
 
-export function Insights({ suggestions, onAccept, onDismiss }: Props) {
+export function Insights({ suggestions, onAccept, onDismiss, onTrigger, projectId }: Props) {
+  const [isTriggering, setIsTriggering] = useState(false)
+  
+  const handleTrigger = async () => {
+    if (!onTrigger || isTriggering) return
+    setIsTriggering(true)
+    try {
+      await onTrigger()
+    } finally {
+      setIsTriggering(false)
+    }
+  }
+  
   const getTypeIcon = (type: Suggestion['type']) => {
     switch (type) {
       case 'merge': return <GitMerge className="w-4 h-4 text-accent-purple" />
@@ -26,9 +41,23 @@ export function Insights({ suggestions, onAccept, onDismiss }: Props) {
 
   return (
     <div className="p-4">
-      <div className="flex items-center gap-2 mb-4 text-gray-400">
-        <Lightbulb className="w-4 h-4" />
-        <span className="text-sm font-medium">Maintenance Insights</span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-gray-400">
+          <Lightbulb className="w-4 h-4" />
+          <span className="text-sm font-medium">Maintenance Insights</span>
+        </div>
+        
+        {onTrigger && projectId && (
+          <button
+            onClick={handleTrigger}
+            disabled={isTriggering}
+            className="flex items-center gap-1 px-3 py-1 bg-accent-purple text-white text-xs rounded hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Run full maintenance analysis"
+          >
+            <RefreshCw className={`w-3 h-3 ${isTriggering ? 'animate-spin' : ''}`} />
+            {isTriggering ? 'Analyzing...' : 'Run Analysis'}
+          </button>
+        )}
       </div>
       
       <div className="space-y-3">

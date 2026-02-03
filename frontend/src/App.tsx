@@ -318,6 +318,22 @@ function App() {
     }
   }
 
+  const handleTriggerMaintenance = async () => {
+    if (!currentProject) return
+    
+    try {
+      console.log('Triggering maintenance analysis for project:', currentProject.id)
+      const result = await api.triggerMaintenance(currentProject.id)
+      console.log('Maintenance analysis result:', result)
+      
+      // Reload suggestions after analysis
+      const newSuggestions = await api.getSuggestions(currentProject.id)
+      setSuggestions(newSuggestions)
+    } catch (err) {
+      console.error('Failed to trigger maintenance:', err)
+    }
+  }
+
   const handleSendMessage = async (content: string, mentionedFiles?: string[]) => {
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -690,6 +706,8 @@ function App() {
                   suggestions={suggestions}
                   onAccept={handleAcceptSuggestion}
                   onDismiss={handleDismissSuggestion}
+                  onTrigger={handleTriggerMaintenance}
+                  projectId={currentProject?.id}
                 />
               )}
               {sidePanel === 'file-viewer' && viewingFile && (

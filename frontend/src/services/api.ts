@@ -283,6 +283,14 @@ class ApiService {
     if (!res.ok) throw new Error('Failed to dismiss suggestion');
   }
 
+  async triggerMaintenance(projectId: string): Promise<any> {
+    const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/maintenance/trigger`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to trigger maintenance');
+    return res.json();
+  }
+
   // Settings - managed by Rust core
   async getSettings(): Promise<Settings> {
     try {

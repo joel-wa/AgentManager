@@ -85,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/projects/:id/suggestions", get(api::get_suggestions))
         .route("/projects/:id/suggestions/:suggestion_id/accept", post(api::accept_suggestion))
         .route("/projects/:id/suggestions/:suggestion_id/dismiss", post(api::dismiss_suggestion))
+        .route("/projects/:id/maintenance/trigger", post(api::trigger_maintenance))
         .with_state(state.clone());
 
     // Build main app with static file serving

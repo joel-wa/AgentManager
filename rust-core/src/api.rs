@@ -422,3 +422,36 @@ pub async fn dismiss_suggestion(
         }
     }
 }
+
+/// Trigger maintenance analysis for a project
+pub async fn trigger_maintenance(
+    State(_state): State<Arc<RwLock<AppState>>>,
+    Path(project_id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let client = reqwest::Client::new();
+    
+    tracing::info!("Triggering maintenance analysis for project: {}", project_id);
+    
+    match client
+        .post(&format!("{}/maintenance/trigger/{}", MAINTENANCE_SERVICE_URL, project_id))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            match response.json::<serde_json::Value>().await {
+                Ok(data) => {
+                    tracing::info!("Maintenance analysis completed for project: {}", project_id);
+                    Ok(Json(data))
+                }
+                Err(e) => {
+                    tracing::error!("Failed to parse maintenance response: {}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        }
+        _ => {
+            tracing::error!("Failed to trigger maintenance for project: {}", project_id);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}

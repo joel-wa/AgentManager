@@ -538,7 +538,7 @@ async def track_with_maintenance_agent(
     try:
         async with httpx.AsyncClient() as client:
             await client.post(
-                "http://localhost:8004/maintenance/context/message",
+                "http://localhost:8002/maintenance/context/message",
                 json={
                     "project_id": project_id,
                     "role": role,
