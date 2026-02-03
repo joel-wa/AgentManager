@@ -1,25 +1,44 @@
 """
 Cloud Client
-Handles communication with cloud AI APIs (Anthropic Claude, OpenAI)
+Handles communication with cloud AI APIs (Anthropic Claude, OpenAI) and local Ollama
 """
 
 import os
 from typing import Optional, Dict, Any, List
 import httpx
+import json
 
 
 class CloudClient:
-    """Client for cloud AI services"""
+    """Client for cloud AI services and local Ollama"""
     
     def __init__(self):
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         self.openai_key = os.getenv("OPENAI_API_KEY")
-        self.default_provider = os.getenv("AI_PROVIDER", "anthropic")
+        self.default_provider = os.getenv("AI_PROVIDER", "ollama")
+        
+        # Ollama configuration (separate from main agent)
+        self.ollama_url = os.getenv("MAINTENANCE_OLLAMA_URL") or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+        self.ollama_model = os.getenv("MAINTENANCE_OLLAMA_MODEL") or os.getenv("OLLAMA_MODEL", "kimi-k2.5:cloud")
+        
         self.timeout = 60.0
     
     async def check_availability(self) -> bool:
-        """Check if any cloud API is available"""
-        return bool(self.anthropic_key or self.openai_key)
+        """Check if any cloud API or Ollama is available"""
+        # Check cloud APIs
+        if self.anthropic_key or self.openai_key:
+            return True
+        
+        # Check Ollama
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.ollama_url}/api/tags",
+                    timeout=5.0
+                )
+                return response.status_code == 200
+        except Exception:
+            return False
     
     async def generate(
         self, 
@@ -27,13 +46,25 @@ class CloudClient:
         system: Optional[str] = None,
         max_tokens: int = 1024
     ) -> str:
-        """Generate text using configured cloud provider"""
-        if self.default_provider == "anthropic" and self.anthropic_key:
+        """Generate text using configured provider (cloud or Ollama)"""
+        # Try configured provider first
+        if self.default_provider == "ollama":
+            return await self._generate_ollama(prompt, system)
+        elif self.default_provider == "anthropic" and self.anthropic_key:
+            return await self._generate_anthropic(prompt, system, max_tokens)
+        elif self.default_provider == "openai" and self.openai_key:
+            return await self._generate_openai(prompt, system, max_tokens)
+        
+        # Fallback: try Ollama, then cloud APIs
+        ollama_response = await self._generate_ollama(prompt, system)
+        if not ollama_response.startswith("Error:"):
+            return ollama_response
+        
+        if self.anthropic_key:
             return await self._generate_anthropic(prompt, system, max_tokens)
         elif self.openai_key:
             return await self._generate_openai(prompt, system, max_tokens)
         else:
-            # Fallback to local response if no API keys
             return self._generate_local_fallback(prompt)
     
     async def _generate_anthropic(
@@ -113,9 +144,70 @@ class CloudClient:
         except Exception as e:
             return f"Error: {str(e)}"
     
+    async def _generate_ollama(
+        self,
+        prompt: str,
+        system: Optional[str] = None
+    ) -> str:
+        """Generate using local Ollama"""
+        try:
+            async with httpx.AsyncClient() as client:
+                messages = []
+                if system:
+                    messages.append({"role": "system", "content": system})
+                messages.append({"role": "user", "content": prompt})
+                
+                # Try chat endpoint first
+                response = await client.post(
+                    f"{self.ollama_url}/api/chat",
+                    json={
+                        "model": self.ollama_model,
+                        "messages": messages,
+                        "stream": False,
+                        "options": {
+                            "temperature": 0.7,
+                        }
+                    },
+                    timeout=self.timeout
+                )
+                
+                # Fallback to generate endpoint if chat not available
+                if response.status_code == 404:
+                    full_prompt = ""
+                    if system:
+                        full_prompt = f"System: {system}\n\n"
+                    full_prompt += f"User: {prompt}\nAssistant:"
+                    
+                    response = await client.post(
+                        f"{self.ollama_url}/api/generate",
+                        json={
+                            "model": self.ollama_model,
+                            "prompt": full_prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                            }
+                        },
+                        timeout=self.timeout
+                    )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    content = data.get("message", {}).get("content") or data.get("response", "")
+                    return content
+                else:
+                    return f"Error: Ollama returned status {response.status_code}"
+        
+        except httpx.TimeoutException:
+            return "Error: Request timed out. The model might be loading or busy."
+        except httpx.ConnectError:
+            return "Error: Cannot connect to Ollama. Please ensure Ollama is running."
+        except Exception as e:
+            return f"Error: {str(e)}"
+    
     def _generate_local_fallback(self, prompt: str) -> str:
-        """Fallback when no cloud APIs available"""
-        return "Cloud AI services not configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY."
+        """Fallback when no AI services available"""
+        return "AI services not configured. Please set up Ollama or configure ANTHROPIC_API_KEY/OPENAI_API_KEY."
     
     async def generate_readme(self, context: Dict[str, Any]) -> str:
         """Generate README content for a project"""
