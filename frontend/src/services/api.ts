@@ -73,6 +73,7 @@ export interface Settings {
   workspace_root: string;
   ollama_url: string;
   ollama_model: string;
+  maintenance_model?: string;
   theme: string;
 }
 

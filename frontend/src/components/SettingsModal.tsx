@@ -18,6 +18,7 @@ export function SettingsModal({ onClose, onSettingsChange }: Props) {
     workspace_root: '',
     ollama_url: 'http://localhost:11434',
     ollama_model: 'gemma:7b',
+    maintenance_model: 'gemma:7b',
     theme: 'dark',
   })
   const [isLoading, setIsLoading] = useState(true)
@@ -117,21 +118,21 @@ export function SettingsModal({ onClose, onSettingsChange }: Props) {
                 AI Model Configuration
               </h3>
               
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400">Ollama URL</label>
+                <input
+                  type="text"
+                  value={settings.ollama_url}
+                  onChange={(e) => handleChange('ollama_url', e.target.value)}
+                  placeholder="http://localhost:11434"
+                  className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2
+                    text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue"
+                />
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs text-gray-400">Ollama URL</label>
-                  <input
-                    type="text"
-                    value={settings.ollama_url}
-                    onChange={(e) => handleChange('ollama_url', e.target.value)}
-                    placeholder="http://localhost:11434"
-                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2
-                      text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className="text-xs text-gray-400">Model</label>
+                  <label className="text-xs text-gray-400">Main Agent Model</label>
                   <input
                     type="text"
                     value={settings.ollama_model}
@@ -140,6 +141,20 @@ export function SettingsModal({ onClose, onSettingsChange }: Props) {
                     className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2
                       text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue"
                   />
+                  <p className="text-xs text-gray-500">Used for chat interactions</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-400">Maintenance Model</label>
+                  <input
+                    type="text"
+                    value={settings.maintenance_model || settings.ollama_model}
+                    onChange={(e) => handleChange('maintenance_model', e.target.value)}
+                    placeholder="gemma:7b"
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2
+                      text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-blue"
+                  />
+                  <p className="text-xs text-gray-500">Used for workspace maintenance</p>
                 </div>
               </div>
             </div>

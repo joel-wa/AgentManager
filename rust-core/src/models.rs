@@ -217,6 +217,8 @@ pub struct Settings {
     pub workspace_root: String,
     pub ollama_url: String,
     pub ollama_model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maintenance_model: Option<String>,
     pub theme: String,
 }
 
@@ -226,6 +228,7 @@ impl Default for Settings {
             workspace_root: default_workspace_root(),
             ollama_url: "http://localhost:11434".to_string(),
             ollama_model: "gemma:7b".to_string(),
+            maintenance_model: Some("gemma:7b".to_string()),
             theme: "dark".to_string(),
         }
     }
