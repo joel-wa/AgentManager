@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Save, Copy, FileText, FileCode, FileJson, Image, Eye, Code } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import rehypeHighlight from 'rehype-highlight'
 
 type Props = {
@@ -176,11 +177,21 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
               <div className="animate-spin w-8 h-8 border-2 border-accent-blue border-t-transparent rounded-full" />
             </div>
           ) : isMarkdown && viewMode === 'preview' ? (
-            <div className="h-full overflow-y-auto p-6 prose prose-invert prose-sm max-w-none">
+            <div className="h-full overflow-y-auto p-6 prose prose-invert prose-sm max-w-none
+              [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0
+              [&_h1]:mt-6 [&_h1]:mb-4 [&_h1:first-child]:mt-0
+              [&_h2]:mt-5 [&_h2]:mb-3 [&_h2:first-child]:mt-0
+              [&_h3]:mt-4 [&_h3]:mb-2 [&_h3:first-child]:mt-0">
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkBreaks]}
                 rehypePlugins={[rehypeHighlight]}
                 components={{
+                  p: ({node, ...props}) => (
+                    <p className="my-4" {...props} />
+                  ),
+                  br: ({node, ...props}) => (
+                    <><br {...props} /><br /></>
+                  ),
                   table: ({node, ...props}) => (
                     <table className="border-collapse border border-gray-600 my-4" {...props} />
                   ),
