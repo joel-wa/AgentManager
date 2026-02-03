@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool, Terminal } from 'lucide-react'
+import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool, Terminal, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -7,14 +7,20 @@ import type { Message, ToolActivity } from '../App'
 
 type Props = {
   messages: Message[]
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, mentionedFiles?: string[]) => void
   isLoading?: boolean
+  availableFiles?: string[]
 }
 
-export function ChatInterface({ messages, onSendMessage, isLoading = false }: Props) {
+export function ChatInterface({ messages, onSendMessage, isLoading = false, availableFiles = [] }: Props) {
   const [input, setInput] = useState('')
+  const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false)
+  const [mentionFilter, setMentionFilter] = useState('')
+  const [mentionPosition, setMentionPosition] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -27,11 +33,63 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Pr
     }
   }, [input])
 
+  // Handle @ mentions
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const cursorPos = textarea.selectionStart
+    const textBeforeCursor = input.slice(0, cursorPos)
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtIndex !== -1 && lastAtIndex === textBeforeCursor.length - 1) {
+      // Just typed @
+      setShowMentionDropdown(true)
+      setMentionFilter('')
+      setMentionPosition(lastAtIndex)
+    } else if (lastAtIndex !== -1) {
+      const textAfterAt = textBeforeCursor.slice(lastAtIndex + 1)
+      if (!textAfterAt.includes(' ') && textAfterAt.length > 0) {
+        // Typing after @
+        setShowMentionDropdown(true)
+        setMentionFilter(textAfterAt)
+        setMentionPosition(lastAtIndex)
+      } else if (textAfterAt.includes(' ')) {
+        setShowMentionDropdown(false)
+      }
+    } else {
+      setShowMentionDropdown(false)
+    }
+  }, [input])
+
+  const filteredFiles = availableFiles.filter(file => 
+    file.toLowerCase().includes(mentionFilter.toLowerCase())
+  ).slice(0, 10)
+
+  const handleMentionSelect = (file: string) => {
+    const beforeMention = input.slice(0, mentionPosition)
+    const afterMention = input.slice(textareaRef.current?.selectionStart || input.length)
+    const newInput = beforeMention + `@${file} ` + afterMention
+    setInput(newInput)
+    setShowMentionDropdown(false)
+    
+    if (!mentionedFiles.includes(file)) {
+      setMentionedFiles([...mentionedFiles, file])
+    }
+    
+    textareaRef.current?.focus()
+  }
+
+  const removeMentionedFile = (file: string) => {
+    setMentionedFiles(mentionedFiles.filter(f => f !== file))
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (input.trim() && !isLoading) {
-      onSendMessage(input.trim())
+      onSendMessage(input.trim(), mentionedFiles)
       setInput('')
+      setMentionedFiles([])
     }
   }
 
@@ -70,6 +128,27 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Pr
       
       {/* Input Area */}
       <div className="border-t border-dark-border p-4">
+        {/* Mentioned Files */}
+        {mentionedFiles.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {mentionedFiles.map(file => (
+              <div
+                key={file}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-accent-blue/20 text-accent-blue rounded text-sm"
+              >
+                <FileText className="w-3 h-3" />
+                <span>{file}</span>
+                <button
+                  onClick={() => removeMentionedFile(file)}
+                  className="hover:bg-accent-blue/30 rounded p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="flex items-end gap-3">
           <button
             type="button"
@@ -85,13 +164,33 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Pr
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a message... (Shift+Enter for new line)"
+              placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
               className="w-full bg-dark-surface border border-dark-border rounded-lg px-4 py-3 pr-12 
                 text-white placeholder-gray-500 resize-none focus:outline-none focus:border-accent-blue
                 transition-colors"
               rows={1}
               disabled={isLoading}
             />
+            
+            {/* Mention Dropdown */}
+            {showMentionDropdown && filteredFiles.length > 0 && (
+              <div
+                ref={dropdownRef}
+                className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-dark-surface border border-dark-border rounded-lg shadow-xl z-50"
+              >
+                {filteredFiles.map(file => (
+                  <button
+                    key={file}
+                    type="button"
+                    onClick={() => handleMentionSelect(file)}
+                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-dark-hover text-left text-sm text-gray-200"
+                  >
+                    <FileText className="w-4 h-4 text-accent-blue" />
+                    <span>{file}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           
           <button
@@ -105,7 +204,7 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false }: Pr
         </form>
         
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Press Enter to send, Shift+Enter for new line
+          Press @ to mention files • Enter to send • Shift+Enter for new line
         </p>
       </div>
     </div>

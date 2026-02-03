@@ -59,6 +59,7 @@ type SidePanel = 'files' | 'search' | 'timeline' | 'insights'
 function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [availableFiles, setAvailableFiles] = useState<string[]>([])
   
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -128,6 +129,13 @@ function App() {
     loadProjects()
   }, [])
 
+  // Load available files when project changes
+  useEffect(() => {
+    if (currentProject) {
+      loadAvailableFiles()
+    }
+  }, [currentProject])
+
   const checkHealth = async () => {
     try {
       const health = await api.checkHealth()
@@ -167,7 +175,32 @@ function App() {
     }
   }
 
-  const handleSendMessage = async (content: string) => {
+  const loadAvailableFiles = async () => {
+    if (!currentProject) return
+    
+    try {
+      const files = await api.listFiles(currentProject.id)
+      const flattenFiles = (items: FileItem[], prefix = ''): string[] => {
+        let result: string[] = []
+        items.forEach(item => {
+          const path = prefix ? `${prefix}/${item.name}` : item.name
+          if (item.type === 'file') {
+            result.push(path)
+          }
+          if (item.children) {
+            result = [...result, ...flattenFiles(item.children, path)]
+          }
+        })
+        return result
+      }
+      setAvailableFiles(flattenFiles(files))
+    } catch (err) {
+      console.error('Failed to load files:', err)
+      setAvailableFiles([])
+    }
+  }
+
+  const handleSendMessage = async (content: string, mentionedFiles?: string[]) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -199,8 +232,14 @@ function App() {
           content: m.content
         }))
       
+      // Add mentioned files context
+      let contextMessage = content
+      if (mentionedFiles && mentionedFiles.length > 0) {
+        contextMessage += `\n\n[Referenced files: ${mentionedFiles.join(', ')}]`
+      }
+      
       const request = {
-        message: content,
+        message: contextMessage,
         context: currentProject?.description,
         tools: ['search', 'read_file', 'write_file', 'list_directory', 'execute_command', 'find_recents', 'create_directory', 'delete_file'],
         project_id: currentProject?.id,
@@ -408,6 +447,7 @@ function App() {
             messages={messages}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
+            availableFiles={availableFiles}
           />
         </div>
         
