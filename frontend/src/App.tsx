@@ -55,7 +55,7 @@ export type Suggestion = {
   affectedFiles?: string[]
 }
 
-type SidePanel = 'files' | 'search' | 'timeline' | 'insights'
+type SidePanel = 'files' | 'search' | 'timeline' | 'insights' | 'file-viewer'
 
 function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
@@ -525,6 +525,7 @@ function App() {
     if (file.type !== 'file') return
     
     setFileLoading(true)
+    setSidePanel('file-viewer') // Switch to file viewer panel
     try {
       const content = await api.getFileContent(currentProject?.id || '1', fullPath)
       setViewingFile({
@@ -586,7 +587,7 @@ function App() {
       
       <div className="flex-1 flex overflow-hidden">
         {/* Main Chat Area */}
-        <div className={`flex-1 flex flex-col ${showSidePanel || viewingFile ? 'max-w-[45%]' : ''}`}>
+        <div className={`flex-1 flex flex-col ${showSidePanel ? 'max-w-[50%]' : ''}`}>
           <ChatInterface 
             messages={messages}
             onSendMessage={handleSendMessage}
@@ -610,7 +611,7 @@ function App() {
         
         {/* Side Panel */}
         {showSidePanel && (
-          <div className="w-[30%] border-l border-dark-border flex flex-col">
+          <div className="w-[50%] border-l border-dark-border flex flex-col">
             {/* Panel Tabs */}
             <div className="flex border-b border-dark-border">
               {sidePanelTabs.map(tab => (
@@ -644,22 +645,21 @@ function App() {
               )}
               {sidePanel === 'timeline' && <Timeline entries={timeline} />}
               {sidePanel === 'insights' && <Insights suggestions={suggestions} />}
+              {sidePanel === 'file-viewer' && viewingFile && (
+                <FileViewer
+                  filePath={viewingFile.path}
+                  fileName={viewingFile.name}
+                  content={viewingFile.content}
+                  isLoading={fileLoading}
+                  onClose={() => {
+                    setViewingFile(null)
+                    setSidePanel('files') // Go back to files view
+                  }}
+                  onSave={handleFileSave}
+                  asSidePanel={true}
+                />
+              )}
             </div>
-          </div>
-        )}
-        
-        {/* File Preview Panel */}
-        {viewingFile && (
-          <div className="w-[25%]">
-            <FileViewer
-              filePath={viewingFile.path}
-              fileName={viewingFile.name}
-              content={viewingFile.content}
-              isLoading={fileLoading}
-              onClose={() => setViewingFile(null)}
-              onSave={handleFileSave}
-              asSidePanel={true}
-            />
           </div>
         )}
       </div>
