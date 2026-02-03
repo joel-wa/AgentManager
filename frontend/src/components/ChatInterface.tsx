@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool, Terminal } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import type { Message, ToolActivity } from '../App'
 
 type Props = {
@@ -136,7 +139,58 @@ function MessageBubble({ message }: { message: Message }) {
       
       <div className={`flex flex-col max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`rounded-lg px-4 py-3 ${isUser ? 'bg-accent-blue text-white' : 'bg-dark-surface text-gray-200'}`}>
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          {isUser ? (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          ) : (
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  table: ({node, ...props}) => (
+                    <table className="border-collapse border border-gray-600 my-4" {...props} />
+                  ),
+                  thead: ({node, ...props}) => (
+                    <thead className="bg-gray-800" {...props} />
+                  ),
+                  th: ({node, ...props}) => (
+                    <th className="border border-gray-600 px-4 py-2 text-left" {...props} />
+                  ),
+                  td: ({node, ...props}) => (
+                    <td className="border border-gray-600 px-4 py-2" {...props} />
+                  ),
+                  code: ({node, inline, ...props}: any) => (
+                    inline ? 
+                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} /> :
+                      <code className="block bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
+                  ),
+                  pre: ({node, ...props}) => (
+                    <pre className="bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
+                  ),
+                  ul: ({node, ...props}) => (
+                    <ul className="list-disc list-inside my-2" {...props} />
+                  ),
+                  ol: ({node, ...props}) => (
+                    <ol className="list-decimal list-inside my-2" {...props} />
+                  ),
+                  blockquote: ({node, ...props}) => (
+                    <blockquote className="border-l-4 border-accent-blue pl-4 italic my-2" {...props} />
+                  ),
+                  h1: ({node, ...props}) => (
+                    <h1 className="text-2xl font-bold mt-4 mb-2" {...props} />
+                  ),
+                  h2: ({node, ...props}) => (
+                    <h2 className="text-xl font-bold mt-3 mb-2" {...props} />
+                  ),
+                  h3: ({node, ...props}) => (
+                    <h3 className="text-lg font-bold mt-2 mb-1" {...props} />
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
         
         <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
@@ -154,14 +208,36 @@ function MessageBubble({ message }: { message: Message }) {
         </div>
         
         {showToolActivity && message.toolActivity && (
-          <div className="mt-2 bg-dark-surface rounded-lg p-3 text-sm space-y-2 w-full">
-            {message.toolActivity.map((activity, idx) => (
-              <div key={idx} className="flex items-center gap-2 text-gray-300">
-                {getToolIcon(activity.type)}
-                <span>{activity.description}</span>
-                <span className="text-gray-500 text-xs">{formatTime(activity.timestamp)}</span>
-              </div>
-            ))}
+          <div className="mt-2 bg-gray-900/50 backdrop-blur rounded-lg border border-gray-700 overflow-hidden w-full">
+            <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                Tool Activity Log
+              </span>
+            </div>
+            <div className="p-3 space-y-2">
+              {message.toolActivity.map((activity, idx) => (
+                <div 
+                  key={idx} 
+                  className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-800/50 transition-colors"
+                >
+                  <div className="mt-0.5 shrink-0">
+                    {getToolIcon(activity.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-200 break-words">{activity.description}</div>
+                    {activity.filePath && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        <FileText className="w-3 h-3 inline mr-1" />
+                        {activity.filePath}
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                    {formatTime(activity.timestamp)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
