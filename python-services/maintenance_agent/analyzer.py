@@ -81,7 +81,11 @@ class WorkspaceAnalyzer:
         seen_patterns = defaultdict(list)
         
         for file in files:
+            # Get name from either 'name' field or extract from 'path'
             name = file.get("name", "")
+            if not name and "path" in file:
+                name = file["path"].split("/")[-1]
+            
             # Extract base name without extension
             base = name.rsplit(".", 1)[0].lower()
             
@@ -103,19 +107,24 @@ class WorkspaceAnalyzer:
         outdated = []
         
         for file in files:
-            name = file.get("name", "").lower()
+            # Get name from either 'name' field or extract from 'path'
+            name = file.get("name", "")
+            if not name and "path" in file:
+                name = file["path"].split("/")[-1]
+            
+            name_lower = name.lower()
             
             # Check for version indicators
-            if any(v in name for v in ["_v1", "_old", "deprecated", "legacy"]):
+            if any(v in name_lower for v in ["_v1", "_old", "deprecated", "legacy"]):
                 outdated.append({
-                    "file": file.get("name"),
+                    "file": name,
                     "reason": "File name suggests outdated content"
                 })
             
             # Check for old date references
-            if any(year in name for year in ["2020", "2021", "2022"]):
+            if any(year in name_lower for year in ["2020", "2021", "2022"]):
                 outdated.append({
-                    "file": file.get("name"),
+                    "file": name,
                     "reason": "File name contains old date reference"
                 })
         
