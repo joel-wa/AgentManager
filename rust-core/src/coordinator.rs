@@ -1,16 +1,19 @@
 use crate::http_client::HttpClient;
-use crate::models::{AgentChatRequest, AgentChatResponse, ToolCall, ToolActivity, ToolType};
+use crate::models::{AgentChatRequest, AgentChatResponse, ToolCall, ToolActivity, ToolType, FileItem, FileType};
+use crate::workspace::WorkspaceManager;
 use chrono::Utc;
 
 /// Coordinates tool execution between Rust core and Python services
 pub struct ToolCoordinator {
     http_client: HttpClient,
+    workspace: WorkspaceManager,
 }
 
 impl ToolCoordinator {
     pub fn new() -> Self {
         Self {
             http_client: HttpClient::new(),
+            workspace: WorkspaceManager::new().expect("Failed to initialize workspace"),
         }
     }
 
@@ -87,8 +90,15 @@ impl ToolCoordinator {
 
     /// Request workspace analysis from maintenance agent
     pub async fn request_analysis(&self, project_id: &str) -> anyhow::Result<()> {
+        // Get all files from the project
+        let files = self.workspace.list_files(project_id)?;
+        
+        // Flatten the file tree and extract file info
+        let file_list = self.flatten_files(&files);
+        
         let request = serde_json::json!({
             "project_id": project_id,
+            "files": file_list,
         });
         
         let _: serde_json::Value = self.http_client
@@ -96,6 +106,28 @@ impl ToolCoordinator {
             .await?;
         
         Ok(())
+    }
+
+    /// Flatten file tree into a list with path, extension, and size
+    fn flatten_files(&self, files: &[FileItem]) -> Vec<serde_json::Value> {
+        let mut result = Vec::new();
+        
+        for file in files {
+            if file.file_type == FileType::File {
+                result.push(serde_json::json!({
+                    "path": file.path.as_ref().unwrap_or(&file.name),
+                    "extension": file.extension.as_ref().unwrap_or(&"".to_string()),
+                    "size": 0, // Size not currently tracked, but analyzer doesn't use it
+                }));
+            }
+            
+            // Recursively process children
+            if let Some(children) = &file.children {
+                result.extend(self.flatten_files(children));
+            }
+        }
+        
+        result
     }
 
     /// Generate embedding for text

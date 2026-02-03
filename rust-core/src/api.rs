@@ -425,15 +425,44 @@ pub async fn dismiss_suggestion(
 
 /// Trigger maintenance analysis for a project
 pub async fn trigger_maintenance(
-    State(_state): State<Arc<RwLock<AppState>>>,
+    State(state): State<Arc<RwLock<AppState>>>,
     Path(project_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let client = reqwest::Client::new();
     
     tracing::info!("Triggering maintenance analysis for project: {}", project_id);
     
+    let state = state.read().await;
+    
+    // Get project to determine workspace path
+    let project = match state.workspace.get_project(&project_id) {
+        Ok(Some(proj)) => proj,
+        Ok(None) => {
+            tracing::error!("Project not found: {}", project_id);
+            return Err(StatusCode::NOT_FOUND);
+        }
+        Err(e) => {
+            tracing::error!("Failed to get project: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+    
+    // Determine project directory
+    let workspace_path = if let Some(location) = &project.location {
+        location.clone()
+    } else {
+        // Use default workspace location
+        let home = std::env::var("USERPROFILE")
+            .or_else(|_| std::env::var("HOME"))
+            .unwrap_or_else(|_| ".".to_string());
+        format!("{}/.agent-workspace/projects/{}", home, project_id)
+    };
+    
     match client
         .post(&format!("{}/maintenance/trigger/{}", MAINTENANCE_SERVICE_URL, project_id))
+        .json(&serde_json::json!({
+            "workspace_path": workspace_path
+        }))
         .send()
         .await
     {

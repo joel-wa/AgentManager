@@ -284,17 +284,19 @@ async def dismiss_suggestion(suggestion_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class TriggerRequest(BaseModel):
+    workspace_path: str
+
+
 @app.post("/maintenance/trigger/{project_id}")
-async def trigger_maintenance(project_id: str):
+async def trigger_maintenance(project_id: str, request: TriggerRequest):
     """Manually trigger full maintenance analysis for a project"""
     try:
         logger.info(f"Manual maintenance trigger for project {project_id}")
         
         # Get project files from file system
         import os
-        project_path = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(
-            os.path.dirname(__file__), "..", "..", "workspace", "projects", project_id
-        )
+        project_path = request.workspace_path
         
         files = []
         if os.path.exists(project_path):
