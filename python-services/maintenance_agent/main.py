@@ -275,16 +275,16 @@ async def accept_suggestion(suggestion_id: str):
 
 @app.post("/maintenance/suggestions/{suggestion_id}/dismiss")
 async def dismiss_suggestion(suggestion_id: str):
-    """Dismiss suggestion"""
+    """Dismiss suggestion (deletes from database)"""
     try:
         suggestion = suggestion_store.get_by_id(suggestion_id)
         
         if not suggestion:
             raise HTTPException(status_code=404, detail="Suggestion not found")
         
-        suggestion_store.update_status(suggestion_id, "dismissed")
-        logger.info(f"Dismissed suggestion {suggestion_id}")
-        return {"status": "dismissed"}
+        suggestion_store.delete_suggestion(suggestion_id)
+        logger.info(f"Deleted dismissed suggestion {suggestion_id}")
+        return {"status": "deleted"}
     except HTTPException:
         raise
     except Exception as e:

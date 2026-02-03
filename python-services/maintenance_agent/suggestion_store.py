@@ -117,6 +117,13 @@ class SuggestionStore:
         conn.commit()
         conn.close()
     
+    def delete_suggestion(self, suggestion_id: str):
+        """Delete suggestion from database"""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("DELETE FROM suggestions WHERE id = ?", (suggestion_id,))
+        conn.commit()
+        conn.close()
+    
     def _row_to_suggestion(self, row: sqlite3.Row) -> Suggestion:
         """Convert database row to Suggestion object"""
         return Suggestion(
