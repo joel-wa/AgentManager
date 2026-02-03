@@ -194,11 +194,14 @@ Return ONLY valid JSON in this exact format:
             if readme_content:
                 readme_info = f"\nCurrent README:\n{readme_content[:500]}"
             
+            # Read MAINTENANCE.md for project-specific rules
+            maintenance_rules = await self._read_maintenance_config(project_id)
+            
             # Ask AI for suggestions
             prompt = f"""Analyze this file change and suggest maintenance actions:
 
 File Changed: {file_path}
-Change Type: {change_type}{content_preview}{structure_info}{readme_info}
+Change Type: {change_type}{content_preview}{structure_info}{readme_info}{maintenance_rules}
 
 Suggest up to 3 maintenance actions from:
 1. Update README - if the change should be reflected in project documentation
@@ -252,6 +255,24 @@ Return ONLY valid JSON array:
             traceback.print_exc()
         
         return suggestions
+    
+    async def _read_maintenance_config(self, project_id: str) -> str:
+        """Read MAINTENANCE.md from project's .meta folder"""
+        try:
+            # Construct path to MAINTENANCE.md
+            workspace_root = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(
+                os.path.dirname(__file__), "..", "..", "workspace", "projects"
+            )
+            maintenance_path = os.path.join(workspace_root, project_id, ".meta", "MAINTENANCE.md")
+            
+            if os.path.exists(maintenance_path):
+                with open(maintenance_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    return f"\n\nProject Maintenance Rules (from MAINTENANCE.md):\n{content[:1500]}"
+        except Exception as e:
+            print(f"Could not read MAINTENANCE.md: {e}")
+        
+        return ""
     
     async def _find_similar_files(self, project_id: str, file_path: str) -> list[str]:
         """Find files similar to the changed file"""
