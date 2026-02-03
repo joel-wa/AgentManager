@@ -22,8 +22,9 @@ class SuggestionStore:
         
         self.db_path = db_path
         
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        # Ensure directory exists (skip for in-memory databases)
+        if db_path != ':memory:':
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         
         self._init_db()
     
