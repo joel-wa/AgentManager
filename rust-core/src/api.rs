@@ -296,7 +296,7 @@ async fn notify_file_change(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let _ = client
-        .post("http://localhost:8004/maintenance/file-change")
+        .post("http://localhost:8002/maintenance/file-change")
         .json(&serde_json::json!({
             "project_id": project_id,
             "file_path": file_path,
@@ -330,37 +330,95 @@ pub async fn get_timeline(
 /// Get maintenance suggestions
 pub async fn get_suggestions(
     State(_state): State<Arc<RwLock<AppState>>>,
-    Path(_id): Path<String>,
+    Path(project_id): Path<String>,
 ) -> Json<Vec<Suggestion>> {
-    // Return mock suggestions for now
-    Json(vec![
-        Suggestion {
-            id: Uuid::new_v4().to_string(),
-            suggestion_type: SuggestionType::Merge,
-            title: "Consolidate similar files".to_string(),
-            description: "Found 3 files with overlapping content".to_string(),
-            affected_files: Some(vec![
-                "notes/nn_basics.md".to_string(),
-                "research/neural_nets.md".to_string(),
-            ]),
-        },
-    ])
+    let client = reqwest::Client::new();
+    
+    match client
+        .get(&format!("{}/maintenance/suggestions/{}", MAINTENANCE_SERVICE_URL, project_id))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            if let Ok(data) = response.json::<serde_json::Value>().await {
+                if let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array()) {
+                    let parsed: Vec<Suggestion> = suggestions.iter().filter_map(|s| {
+                        Some(Suggestion {
+                            id: s.get("id")?.as_str()?.to_string(),
+                            suggestion_type: match s.get("type")?.as_str()? {
+                                "merge" => SuggestionType::Merge,
+                                "outdated" => SuggestionType::Outdated,
+                                "update" => SuggestionType::Update,
+                                _ => return None,
+                            },
+                            title: s.get("title")?.as_str()?.to_string(),
+                            description: s.get("description")?.as_str()?.to_string(),
+                            affected_files: s.get("affected_files").and_then(|f| {
+                                f.as_array().map(|arr| {
+                                    arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+                                })
+                            }),
+                        })
+                    }).collect();
+                    return Json(parsed);
+                }
+            }
+        }
+        _ => {}
+    }
+    
+    // Return empty on error
+    Json(vec![])
 }
 
 /// Accept a suggestion
 pub async fn accept_suggestion(
     Path((_project_id, suggestion_id)): Path<(String, String)>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Implement suggestion acceptance via maintenance service
-    tracing::info!("Accepting suggestion: {}", suggestion_id);
-    Ok(StatusCode::OK)
+    let client = reqwest::Client::new();
+    
+    match client
+        .post(&format!("{}/maintenance/suggestions/{}/accept", MAINTENANCE_SERVICE_URL, suggestion_id))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            tracing::info!("Accepted suggestion: {}", suggestion_id);
+            Ok(StatusCode::OK)
+        }
+        Ok(response) if response.status() == 404 => {
+            tracing::warn!("Suggestion not found: {}", suggestion_id);
+            Err(StatusCode::NOT_FOUND)
+        }
+        _ => {
+            tracing::error!("Failed to accept suggestion: {}", suggestion_id);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 /// Dismiss a suggestion
 pub async fn dismiss_suggestion(
     Path((_project_id, suggestion_id)): Path<(String, String)>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: Implement suggestion dismissal
-    tracing::info!("Dismissing suggestion: {}", suggestion_id);
-    Ok(StatusCode::OK)
+    let client = reqwest::Client::new();
+    
+    match client
+        .post(&format!("{}/maintenance/suggestions/{}/dismiss", MAINTENANCE_SERVICE_URL, suggestion_id))
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            tracing::info!("Dismissed suggestion: {}", suggestion_id);
+            Ok(StatusCode::OK)
+        }
+        Ok(response) if response.status() == 404 => {
+            tracing::warn!("Suggestion not found: {}", suggestion_id);
+            Err(StatusCode::NOT_FOUND)
+        }
+        _ => {
+            tracing::error!("Failed to dismiss suggestion: {}", suggestion_id);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }

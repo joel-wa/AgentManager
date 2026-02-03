@@ -94,24 +94,9 @@ function App() {
   } | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
   
-  const [suggestions] = useState<Suggestion[]>([
-    {
-      id: '1',
-      type: 'merge',
-      title: 'Consolidate similar files',
-      description: 'Found 3 files with overlapping content about neural networks',
-      affectedFiles: ['notes/nn_basics.md', 'research/neural_nets.md', 'drafts/nn_summary.md']
-    },
-    {
-      id: '2',
-      type: 'outdated',
-      title: 'Outdated reference detected',
-      description: 'api_v1_notes.md references deprecated API version',
-      affectedFiles: ['api_v1_notes.md']
-    }
-  ])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
-  const [timeline] = useState<TimelineEntry[]>([
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([
     {
       id: '1',
       timestamp: new Date(Date.now() - 3600000),
@@ -148,6 +133,8 @@ function App() {
   useEffect(() => {
     if (currentProject) {
       loadAvailableFiles()
+      loadSuggestions()
+      loadTimeline()
     }
   }, [currentProject])
 
@@ -274,6 +261,60 @@ function App() {
     } catch (err) {
       console.error('Failed to load files:', err)
       setAvailableFiles([])
+    }
+  }
+
+  const loadSuggestions = async () => {
+    if (!currentProject) return
+    
+    try {
+      const data = await api.getSuggestions(currentProject.id)
+      setSuggestions(data)
+    } catch (err) {
+      console.error('Failed to load suggestions:', err)
+      setSuggestions([])
+    }
+  }
+
+  const loadTimeline = async () => {
+    if (!currentProject) return
+    
+    try {
+      const data = await api.getTimeline(currentProject.id)
+      const entries = data.map(entry => ({
+        id: entry.id,
+        timestamp: new Date(entry.timestamp),
+        title: entry.title,
+        files: entry.files
+      }))
+      setTimeline(entries)
+    } catch (err) {
+      console.error('Failed to load timeline:', err)
+      setTimeline([])
+    }
+  }
+
+  const handleAcceptSuggestion = async (suggestionId: string) => {
+    if (!currentProject) return
+    
+    try {
+      await api.acceptSuggestion(currentProject.id, suggestionId)
+      // Remove from list after accepting
+      setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
+    } catch (err) {
+      console.error('Failed to accept suggestion:', err)
+    }
+  }
+
+  const handleDismissSuggestion = async (suggestionId: string) => {
+    if (!currentProject) return
+    
+    try {
+      await api.dismissSuggestion(currentProject.id, suggestionId)
+      // Remove from list after dismissing
+      setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
+    } catch (err) {
+      console.error('Failed to dismiss suggestion:', err)
     }
   }
 
@@ -644,7 +685,13 @@ function App() {
                 />
               )}
               {sidePanel === 'timeline' && <Timeline entries={timeline} />}
-              {sidePanel === 'insights' && <Insights suggestions={suggestions} />}
+              {sidePanel === 'insights' && (
+                <Insights 
+                  suggestions={suggestions}
+                  onAccept={handleAcceptSuggestion}
+                  onDismiss={handleDismissSuggestion}
+                />
+              )}
               {sidePanel === 'file-viewer' && viewingFile && (
                 <FileViewer
                   filePath={viewingFile.path}

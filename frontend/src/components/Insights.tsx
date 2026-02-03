@@ -3,9 +3,11 @@ import type { Suggestion } from '../App'
 
 type Props = {
   suggestions: Suggestion[]
+  onAccept: (id: string) => void
+  onDismiss: (id: string) => void
 }
 
-export function Insights({ suggestions }: Props) {
+export function Insights({ suggestions, onAccept, onDismiss }: Props) {
   const getTypeIcon = (type: Suggestion['type']) => {
     switch (type) {
       case 'merge': return <GitMerge className="w-4 h-4 text-accent-purple" />
@@ -60,11 +62,17 @@ export function Insights({ suggestions }: Props) {
                 )}
                 
                 <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-1 px-3 py-1 bg-accent-blue text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                  <button 
+                    onClick={() => onAccept(suggestion.id)}
+                    className="flex items-center gap-1 px-3 py-1 bg-accent-blue text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                  >
                     <Check className="w-3 h-3" />
                     Accept
                   </button>
-                  <button className="flex items-center gap-1 px-3 py-1 bg-dark-border text-gray-300 text-xs rounded hover:bg-dark-hover transition-colors">
+                  <button 
+                    onClick={() => onDismiss(suggestion.id)}
+                    className="flex items-center gap-1 px-3 py-1 bg-dark-border text-gray-300 text-xs rounded hover:bg-dark-hover transition-colors"
+                  >
                     <X className="w-3 h-3" />
                     Dismiss
                   </button>
