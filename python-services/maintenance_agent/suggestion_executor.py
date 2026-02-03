@@ -45,10 +45,8 @@ class SuggestionExecutor:
             elif suggestion.type == "organize":
                 return await self._execute_organization(suggestion, project_id)
             elif suggestion.type == "update":
-                return ExecutionResult(
-                    success=True,
-                    changes=[f"Noted suggestion: {suggestion.title}"]
-                )
+                # Actually update the README
+                return await self._execute_readme_update(suggestion, project_id)
             else:
                 return ExecutionResult(
                     success=False,
@@ -193,4 +191,53 @@ Return ONLY the merged content, no explanations."""
                 return True
         except Exception as e:
             print(f"Error archiving file {file_path}: {e}")
-        return False
+        return False    
+    async def _execute_readme_update(
+        self,
+        suggestion: Suggestion,
+        project_id: str
+    ) -> ExecutionResult:
+        """Update README with AI-generated content"""
+        try:
+            # Gather context about the project
+            import json
+            
+            # Read project.json for metadata
+            project_json_path = os.path.join(self.current_workspace, ".meta", "project.json")
+            project_info = {}
+            if os.path.exists(project_json_path):
+                with open(project_json_path, 'r', encoding='utf-8') as f:
+                    project_info = json.load(f)
+            
+            # Get list of files
+            files = []
+            for root, dirs, filenames in os.walk(self.current_workspace):
+                # Skip hidden directories
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                for filename in filenames:
+                    if not filename.startswith('.'):
+                        rel_path = os.path.relpath(os.path.join(root, filename), self.current_workspace)
+                        files.append(rel_path)
+            
+            # Build context for README generation
+            context = {
+                "name": project_info.get("name", "Project"),
+                "description": project_info.get("description", ""),
+                "files": files
+            }
+            
+            # Generate README content using AI
+            readme_content = await self.cloud_client.generate_readme(context)
+            
+            # Write to README.md
+            await self._write_file(project_id, "README.md", readme_content)
+            
+            return ExecutionResult(
+                success=True,
+                changes=["Updated README.md with AI-generated content"]
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error=f"Error updating README: {str(e)}"
+            )
