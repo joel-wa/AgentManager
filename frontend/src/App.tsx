@@ -403,7 +403,7 @@ function App() {
       
       <div className="flex-1 flex overflow-hidden">
         {/* Main Chat Area */}
-        <div className={`flex-1 flex flex-col ${showSidePanel ? 'max-w-[60%]' : ''}`}>
+        <div className={`flex-1 flex flex-col ${showSidePanel || viewingFile ? 'max-w-[45%]' : ''}`}>
           <ChatInterface 
             messages={messages}
             onSendMessage={handleSendMessage}
@@ -426,7 +426,7 @@ function App() {
         
         {/* Side Panel */}
         {showSidePanel && (
-          <div className="w-[40%] border-l border-dark-border flex flex-col">
+          <div className="w-[30%] border-l border-dark-border flex flex-col">
             {/* Panel Tabs */}
             <div className="flex border-b border-dark-border">
               {sidePanelTabs.map(tab => (
@@ -463,6 +463,21 @@ function App() {
             </div>
           </div>
         )}
+        
+        {/* File Preview Panel */}
+        {viewingFile && (
+          <div className="w-[25%]">
+            <FileViewer
+              filePath={viewingFile.path}
+              fileName={viewingFile.name}
+              content={viewingFile.content}
+              isLoading={fileLoading}
+              onClose={() => setViewingFile(null)}
+              onSave={handleFileSave}
+              asSidePanel={true}
+            />
+          </div>
+        )}
       </div>
       
       {showNewProjectModal && (
@@ -475,17 +490,6 @@ function App() {
       {showSettingsModal && (
         <SettingsModal
           onClose={() => setShowSettingsModal(false)}
-        />
-      )}
-      
-      {viewingFile && (
-        <FileViewer
-          filePath={viewingFile.path}
-          fileName={viewingFile.name}
-          content={viewingFile.content}
-          isLoading={fileLoading}
-          onClose={() => setViewingFile(null)}
-          onSave={handleFileSave}
         />
       )}
     </div>

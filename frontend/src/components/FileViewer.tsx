@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Save, Copy, Download, FileText, FileCode, FileJson, Image, ExternalLink } from 'lucide-react'
+import { X, Save, Copy, FileText, FileCode, FileJson, Image, Eye, Code } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 
 type Props = {
   filePath: string
@@ -9,12 +12,16 @@ type Props = {
   onClose: () => void
   onSave?: (content: string) => void
   readOnly?: boolean
+  asSidePanel?: boolean
 }
 
-export function FileViewer({ filePath, fileName, content, isLoading, onClose, onSave, readOnly = false }: Props) {
+export function FileViewer({ filePath, fileName, content, isLoading, onClose, onSave, readOnly = false, asSidePanel = false }: Props) {
   const [editedContent, setEditedContent] = useState(content)
   const [hasChanges, setHasChanges] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('preview')
+
+  const isMarkdown = fileName.endsWith('.md')
 
   useEffect(() => {
     setEditedContent(content)
@@ -37,30 +44,6 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
     await navigator.clipboard.writeText(editedContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  const handleDownload = () => {
-    const blob = new Blob([editedContent], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleOpenWith = () => {
-    // Note: Creates a blob with application/octet-stream type and triggers download.
-    // Browser behavior varies: most browsers will download the file, which can then be 
-    // opened with the user's preferred application. True "Open With" dialog depends on 
-    // OS/browser integration and may require desktop application support.
-    const blob = new Blob([editedContent], { type: 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   const getFileIcon = () => {
@@ -98,35 +81,60 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
     return langMap[ext || ''] || 'plaintext'
   }
 
+  const containerClass = asSidePanel 
+    ? "h-full flex flex-col bg-dark-surface border-l border-dark-border"
+    : "fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+
+  const innerClass = asSidePanel
+    ? "h-full flex flex-col"
+    : "bg-dark-surface rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] mx-4 flex flex-col"
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-dark-surface rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] mx-4 flex flex-col">
+    <div className={containerClass}>
+      <div className={innerClass}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-dark-border">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {getFileIcon()}
-            <div>
-              <h2 className="text-lg font-semibold text-white">{fileName}</h2>
-              <p className="text-xs text-gray-500">{filePath}</p>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-white truncate">{fileName}</h2>
+              <p className="text-xs text-gray-500 truncate">{filePath}</p>
             </div>
             {hasChanges && (
               <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded">
-                Unsaved changes
+                Unsaved
               </span>
             )}
           </div>
           
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleOpenWith}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors text-sm"
-              title="Open with external application"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Open With
-            </button>
-            
-            <div className="w-px h-6 bg-dark-border" />
+            {isMarkdown && (
+              <>
+                <button
+                  onClick={() => setViewMode('preview')}
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'preview' 
+                      ? 'bg-accent-blue text-white' 
+                      : 'text-gray-400 hover:text-white hover:bg-dark-hover'
+                  }`}
+                  title="Preview mode"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('edit')}
+                  className={`p-2 rounded-lg transition-colors ${
+                    viewMode === 'edit' 
+                      ? 'bg-accent-blue text-white' 
+                      : 'text-gray-400 hover:text-white hover:bg-dark-hover'
+                  }`}
+                  title="Edit mode"
+                >
+                  <Code className="w-4 h-4" />
+                </button>
+                <div className="w-px h-6 bg-dark-border" />
+              </>
+            )}
             
             <button
               onClick={handleCopy}
@@ -136,14 +144,6 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
               <Copy className="w-4 h-4" />
             </button>
             {copied && <span className="text-xs text-green-400">Copied!</span>}
-            
-            <button
-              onClick={handleDownload}
-              className="p-2 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors"
-              title="Download file"
-            >
-              <Download className="w-4 h-4" />
-            </button>
             
             {!readOnly && onSave && (
               <button
@@ -157,7 +157,6 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
                 title="Save changes"
               >
                 <Save className="w-4 h-4" />
-                Save
               </button>
             )}
             
@@ -175,6 +174,37 @@ export function FileViewer({ filePath, fileName, content, isLoading, onClose, on
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin w-8 h-8 border-2 border-accent-blue border-t-transparent rounded-full" />
+            </div>
+          ) : isMarkdown && viewMode === 'preview' ? (
+            <div className="h-full overflow-y-auto p-6 prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  table: ({node, ...props}) => (
+                    <table className="border-collapse border border-gray-600 my-4" {...props} />
+                  ),
+                  thead: ({node, ...props}) => (
+                    <thead className="bg-gray-800" {...props} />
+                  ),
+                  th: ({node, ...props}) => (
+                    <th className="border border-gray-600 px-4 py-2 text-left" {...props} />
+                  ),
+                  td: ({node, ...props}) => (
+                    <td className="border border-gray-600 px-4 py-2" {...props} />
+                  ),
+                  code: ({node, inline, ...props}: any) => (
+                    inline ? 
+                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props} /> :
+                      <code className="block bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
+                  ),
+                  pre: ({node, ...props}) => (
+                    <pre className="bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
+                  ),
+                }}
+              >
+                {editedContent}
+              </ReactMarkdown>
             </div>
           ) : (
             <textarea
