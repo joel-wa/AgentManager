@@ -546,7 +546,7 @@ async def track_with_maintenance_agent(
                 },
                 timeout=2.0  # Don't wait long
             )
-    except:
+    except Exception:
         pass  # Don't fail if maintenance agent down
 
 

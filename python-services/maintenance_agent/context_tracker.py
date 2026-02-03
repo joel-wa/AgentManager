@@ -12,10 +12,15 @@ from models import Message, ContextSnapshot
 class ConversationContext:
     """Track conversation history relevant to file changes"""
     
+    # Configuration constants
+    MAX_MESSAGES_PER_PROJECT = 50
+    CONTENT_PREVIEW_LENGTH = 100
+    MAX_DECISION_LENGTH = 150
+    
     def __init__(self):
         self.conversations: Dict[str, List[Message]] = {}  # project_id -> messages
         self.file_change_contexts: Dict[str, ContextSnapshot] = {}  # file_path -> snapshot
-        self.max_messages_per_project = 50
+        self.max_messages_per_project = self.MAX_MESSAGES_PER_PROJECT
     
     def add_message(self, project_id: str, message: Message):
         """Called by main agent after each message"""
@@ -59,7 +64,7 @@ class ConversationContext:
         summary_parts = []
         for msg in messages[-5:]:  # Last 5 messages
             role_label = "User" if msg.role == "user" else "Assistant"
-            content_preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+            content_preview = msg.content[:self.CONTENT_PREVIEW_LENGTH] + "..." if len(msg.content) > self.CONTENT_PREVIEW_LENGTH else msg.content
             summary_parts.append(f"{role_label}: {content_preview}")
         
         return " | ".join(summary_parts)
@@ -77,7 +82,7 @@ class ConversationContext:
                 matches = re.finditer(pattern, msg.content, re.IGNORECASE)
                 for match in matches:
                     decision = match.group(0).strip()
-                    if len(decision) < 150:  # Keep it concise
+                    if len(decision) < self.MAX_DECISION_LENGTH:  # Keep it concise
                         decisions.append(decision)
         
         return decisions[-5:]  # Return last 5 decisions

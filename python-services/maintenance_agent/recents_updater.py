@@ -15,8 +15,8 @@ class RecentsUpdater:
     
     def __init__(self, projects_root: str = None):
         if projects_root is None:
-            # Default to workspace root
-            projects_root = os.path.join(os.path.dirname(__file__), "..", "..", "workspace", "projects")
+            # Try to get from environment, fall back to relative path
+            projects_root = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(os.path.dirname(__file__), "..", "..", "workspace", "projects")
         self.projects_root = projects_root
     
     async def update_recents(
@@ -30,7 +30,7 @@ class RecentsUpdater:
         try:
             recents_path = os.path.join(self.projects_root, project_id, "Recents.md")
             
-            # Ensure .meta directory exists
+            # Ensure project directory exists
             os.makedirs(os.path.dirname(recents_path), exist_ok=True)
             
             # Read existing content

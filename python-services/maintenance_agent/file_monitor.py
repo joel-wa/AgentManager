@@ -187,7 +187,7 @@ Return ONLY valid JSON in this exact format:
                 if response.status_code == 200:
                     data = response.json()
                     return data.get("similar_files", [])
-        except:
+        except Exception as e:
             pass
         
         return []

@@ -13,10 +13,14 @@ from cloud_client import CloudClient
 class SuggestionExecutor:
     """Execute accepted maintenance suggestions"""
     
+    # Configuration constant
+    MAX_CONTENT_PREVIEW_LENGTH = 1000
+    
     def __init__(self, cloud_client: CloudClient, projects_root: str = None):
         self.cloud_client = cloud_client
         if projects_root is None:
-            projects_root = os.path.join(os.path.dirname(__file__), "..", "..", "workspace", "projects")
+            # Try to get from environment, fall back to relative path
+            projects_root = os.environ.get('WORKSPACE_PROJECTS_ROOT') or os.path.join(os.path.dirname(__file__), "..", "..", "workspace", "projects")
         self.projects_root = projects_root
     
     async def execute(
@@ -124,7 +128,7 @@ class SuggestionExecutor:
     async def _intelligent_merge(self, contents: list) -> str:
         """Use LLM to merge file contents intelligently"""
         files_desc = "\n\n".join([
-            f"--- File: {c['path']} ---\n{c['content'][:1000]}"
+            f"--- File: {c['path']} ---\n{c['content'][:self.MAX_CONTENT_PREVIEW_LENGTH]}"
             for c in contents
         ])
         
