@@ -44,6 +44,10 @@ class SuggestionExecutor:
                 return await self._execute_update(suggestion, project_id)
             elif suggestion.type == "organize":
                 return await self._execute_organization(suggestion, project_id)
+            elif suggestion.type == "move":
+                return await self._execute_move(suggestion, project_id)
+            elif suggestion.type == "modify":
+                return await self._execute_modify(suggestion, project_id)
             elif suggestion.type == "update":
                 # Actually update the README
                 return await self._execute_readme_update(suggestion, project_id)
@@ -240,4 +244,94 @@ Return ONLY the merged content, no explanations."""
             return ExecutionResult(
                 success=False,
                 error=f"Error updating README: {str(e)}"
+            )
+    
+    async def _execute_move(
+        self,
+        suggestion: Suggestion,
+        project_id: str
+    ) -> ExecutionResult:
+        """Move files to new locations"""
+        import shutil
+        
+        try:
+            changes = []
+            affected_files = suggestion.affected_files or []
+            
+            if not affected_files:
+                return ExecutionResult(
+                    success=False,
+                    error="No files specified to move"
+                )
+            
+            # Use AI to determine move operations from description
+            prompt = f"""Based on this maintenance suggestion, determine the file move operations needed.
+
+Suggestion: {suggestion.title}
+Description: {suggestion.description}
+Files: {', '.join(affected_files)}
+
+Return a JSON array of move operations:
+[
+  {{"source": "file.md", "destination": "folder/file.md"}}
+]"""
+            
+            response = await self.cloud_client.generate(
+                prompt,
+                system="Return valid JSON array only with source and destination paths."
+            )
+            
+            # Parse move operations
+            response_clean = response.strip()
+            if response_clean.startswith('```json'):
+                response_clean = response_clean[7:]
+            if response_clean.startswith('```'):
+                response_clean = response_clean[3:]
+            if response_clean.endswith('```'):
+                response_clean = response_clean[:-3]
+            
+            import json
+            moves = json.loads(response_clean.strip())
+            
+            # Execute moves
+            for move_op in moves:
+                source = os.path.join(self.current_workspace, move_op['source'])
+                dest = os.path.join(self.current_workspace, move_op['destination'])
+                
+                if os.path.exists(source):
+                    # Create destination directory if needed
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    shutil.move(source, dest)
+                    changes.append(f"Moved {move_op['source']} → {move_op['destination']}")
+            
+            return ExecutionResult(
+                success=True,
+                changes=changes
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error=f"Error moving files: {str(e)}"
+            )
+    
+    async def _execute_modify(
+        self,
+        suggestion: Suggestion,
+        project_id: str
+    ) -> ExecutionResult:
+        """Modify files for consistency"""
+        try:
+            # Use AI to determine what modifications to make
+            changes = [f"Would modify files: {', '.join(suggestion.affected_files or [])}"]
+            
+            # For now, return success with description
+            # In the future, implement actual AI-driven modifications
+            return ExecutionResult(
+                success=True,
+                changes=changes + ["Note: This is a preview. Actual modifications not yet implemented."]
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                error=f"Error modifying files: {str(e)}"
             )

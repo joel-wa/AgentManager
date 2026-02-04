@@ -353,7 +353,14 @@ async def accept_suggestion(suggestion_id: str):
         # Get workspace path for this project
         workspace_path = project_paths.get(suggestion.project_id)
         if not workspace_path:
-            raise HTTPException(status_code=400, detail="Project workspace path not found. Please trigger analysis first.")
+            # Fall back to constructing path from environment
+            import os
+            workspace_root = os.environ.get('WORKSPACE_PROJECTS_ROOT')
+            if not workspace_root:
+                home = os.environ.get("USERPROFILE") or os.environ.get("HOME") or "."
+                workspace_root = os.path.join(home, ".agent-workspace", "projects")
+            workspace_path = os.path.join(workspace_root, suggestion.project_id)
+            logger.info(f"Constructed workspace path: {workspace_path}")
         
         # Execute
         result = await suggestion_executor.execute(
