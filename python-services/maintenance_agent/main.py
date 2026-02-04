@@ -428,11 +428,10 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
         
         logger.info(f"Found {len(files)} files for analysis")
         
-        # Run analysis with optional custom message context
+        # Run analysis
         analysis_result = await analyzer.analyze(
             project_id=project_id,
-            files=files,
-            custom_context=request.custom_message
+            files=files
         )
         
         # Generate suggestions
