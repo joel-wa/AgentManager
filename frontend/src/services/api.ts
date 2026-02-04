@@ -269,11 +269,15 @@ class ApiService {
     return res.json();
   }
 
-  async acceptSuggestion(projectId: string, suggestionId: string): Promise<void> {
+  async acceptSuggestion(projectId: string, suggestionId: string): Promise<{ success: boolean; changes?: string[]; error?: string }> {
     const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/suggestions/${suggestionId}/accept`, {
       method: 'POST',
     });
-    if (!res.ok) throw new Error('Failed to accept suggestion');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to accept suggestion' }));
+      throw new Error(error.error || 'Failed to accept suggestion');
+    }
+    return res.json();
   }
 
   async dismissSuggestion(projectId: string, suggestionId: string): Promise<void> {
@@ -283,9 +287,11 @@ class ApiService {
     if (!res.ok) throw new Error('Failed to dismiss suggestion');
   }
 
-  async triggerMaintenance(projectId: string): Promise<any> {
+  async triggerMaintenance(projectId: string, customMessage?: string): Promise<any> {
     const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/maintenance/trigger`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_message: customMessage }),
     });
     if (!res.ok) throw new Error('Failed to trigger maintenance');
     return res.json();

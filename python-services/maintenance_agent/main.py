@@ -301,6 +301,7 @@ async def dismiss_suggestion(suggestion_id: str):
 
 class TriggerRequest(BaseModel):
     workspace_path: str
+    custom_message: Optional[str] = None
 
 
 @app.post("/maintenance/trigger/{project_id}")
@@ -308,6 +309,8 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
     """Manually trigger full maintenance analysis for a project"""
     try:
         logger.info(f"Manual maintenance trigger for project {project_id}")
+        if request.custom_message:
+            logger.info(f"Custom message: {request.custom_message}")
         
         # Get project files from file system
         import os
@@ -334,10 +337,11 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
         
         logger.info(f"Found {len(files)} files for analysis")
         
-        # Run analysis
+        # Run analysis with optional custom message context
         analysis_result = await analyzer.analyze(
             project_id=project_id,
-            files=files
+            files=files,
+            custom_context=request.custom_message
         )
         
         # Generate suggestions

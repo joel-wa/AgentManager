@@ -85,6 +85,7 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [workspaceHealth, setWorkspaceHealth] = useState<'good' | 'warning' | 'critical'>('good')
   const [isLoading, setIsLoading] = useState(false)
+  const [isProcessingSuggestion, setIsProcessingSuggestion] = useState(false)
   
   // File viewer state
   const [viewingFile, setViewingFile] = useState<{
@@ -294,36 +295,52 @@ function App() {
     }
   }
 
-  const handleAcceptSuggestion = async (suggestionId: string) => {
-    if (!currentProject) return
+  const handleAcceptSuggestion = async (suggestionId: string): Promise<{ success: boolean; changes?: string[]; error?: string }> => {
+    if (!currentProject) return { success: false, error: 'No project selected' }
     
+    setIsProcessingSuggestion(true)
     try {
-      await api.acceptSuggestion(currentProject.id, suggestionId)
-      // Remove from list after accepting
-      setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
+      const result = await api.acceptSuggestion(currentProject.id, suggestionId)
+      
+      if (result.success) {
+        // Remove from list after successful accept
+        setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
+      }
+      
+      return result
     } catch (err) {
       console.error('Failed to accept suggestion:', err)
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to accept suggestion'
+      }
+    } finally {
+      setIsProcessingSuggestion(false)
     }
   }
 
-  const handleDismissSuggestion = async (suggestionId: string) => {
+  const handleDismissSuggestion = async (suggestionId: string): Promise<void> => {
     if (!currentProject) return
     
+    setIsProcessingSuggestion(true)
     try {
       await api.dismissSuggestion(currentProject.id, suggestionId)
       // Remove from list after dismissing
       setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
     } catch (err) {
       console.error('Failed to dismiss suggestion:', err)
+      throw err
+    } finally {
+      setIsProcessingSuggestion(false)
     }
   }
 
-  const handleTriggerMaintenance = async () => {
+  const handleTriggerMaintenance = async (customMessage?: string): Promise<void> => {
     if (!currentProject) return
     
     try {
       console.log('Triggering maintenance analysis for project:', currentProject.id)
-      const result = await api.triggerMaintenance(currentProject.id)
+      const result = await api.triggerMaintenance(currentProject.id, customMessage)
       console.log('Maintenance analysis result:', result)
       
       // Reload suggestions after analysis
@@ -331,6 +348,7 @@ function App() {
       setSuggestions(newSuggestions)
     } catch (err) {
       console.error('Failed to trigger maintenance:', err)
+      throw err
     }
   }
 
@@ -708,6 +726,7 @@ function App() {
                   onDismiss={handleDismissSuggestion}
                   onTrigger={handleTriggerMaintenance}
                   projectId={currentProject?.id}
+                  isProcessing={isProcessingSuggestion}
                 />
               )}
               {sidePanel === 'file-viewer' && viewingFile && (

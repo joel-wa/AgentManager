@@ -3,11 +3,14 @@ Execute accepted maintenance suggestions
 """
 
 import os
+import logging
 from typing import Optional
 import json
 
 from models import Suggestion, ExecutionResult
 from cloud_client import CloudClient
+
+logger = logging.getLogger(__name__)
 
 
 class SuggestionExecutor:
@@ -30,32 +33,59 @@ class SuggestionExecutor:
         project_id: str,
         workspace_path: str = None
     ) -> ExecutionResult:
-        """Execute a suggestion and return result"""
+        """Execute a suggestion and return result with rollback on error"""
         # Use provided workspace_path if given
         if workspace_path:
             self.current_workspace = workspace_path
         else:
             self.current_workspace = os.path.join(self.projects_root, project_id)
         
+        # Create backup directory for rollback
+        backup_dir = os.path.join(self.current_workspace, ".meta", "backup", suggestion.id)
+        os.makedirs(backup_dir, exist_ok=True)
+        
         try:
+            # Backup affected files before making changes
+            if suggestion.affected_files:
+                for file_path in suggestion.affected_files:
+                    await self._backup_file(project_id, file_path, backup_dir)
+            
+            # Execute based on type
             if suggestion.type == "merge":
-                return await self._execute_merge(suggestion, project_id)
+                result = await self._execute_merge(suggestion, project_id)
             elif suggestion.type == "outdated":
-                return await self._execute_update(suggestion, project_id)
+                result = await self._execute_update(suggestion, project_id)
             elif suggestion.type == "organize":
-                return await self._execute_organization(suggestion, project_id)
+                result = await self._execute_organization(suggestion, project_id)
             elif suggestion.type == "update":
-                # Actually update the README
-                return await self._execute_readme_update(suggestion, project_id)
+                result = await self._execute_readme_update(suggestion, project_id)
             else:
                 return ExecutionResult(
                     success=False,
                     error=f"Unknown suggestion type: {suggestion.type}"
                 )
+            
+            # If successful, clean up backup
+            if result.success:
+                import shutil
+                shutil.rmtree(backup_dir, ignore_errors=True)
+            
+            return result
+            
         except Exception as e:
+            # Rollback on any error
+            logger.error(f"Error executing suggestion {suggestion.id}: {e}")
+            rollback_success = await self._rollback_changes(backup_dir)
+            
+            error_msg = f"Execution failed: {str(e)}"
+            if rollback_success:
+                error_msg += " (Changes have been rolled back)"
+            else:
+                error_msg += " (WARNING: Rollback may have failed - please check files manually)"
+            
             return ExecutionResult(
                 success=False,
-                error=str(e)
+                error=error_msg
             )
     
     async def _execute_merge(
@@ -240,4 +270,59 @@ Return ONLY the merged content, no explanations."""
             return ExecutionResult(
                 success=False,
                 error=f"Error updating README: {str(e)}"
-            )
+            )    
+    async def _backup_file(
+        self,
+        project_id: str,
+        file_path: str,
+        backup_dir: str
+    ) -> bool:
+        """Backup a file before modification"""
+        try:
+            source_path = os.path.join(self.current_workspace, file_path)
+            if not os.path.exists(source_path):
+                return True  # File doesn't exist, nothing to backup
+            
+            # Create subdirectories in backup
+            backup_file = os.path.join(backup_dir, file_path)
+            os.makedirs(os.path.dirname(backup_file), exist_ok=True)
+            
+            # Copy file
+            import shutil
+            shutil.copy2(source_path, backup_file)
+            logger.info(f"Backed up {file_path} to {backup_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to backup {file_path}: {e}")
+            return False
+    
+    async def _rollback_changes(
+        self,
+        backup_dir: str
+    ) -> bool:
+        """Rollback changes from backup directory"""
+        try:
+            if not os.path.exists(backup_dir):
+                return True
+            
+            import shutil
+            
+            # Restore all backed up files
+            for root, dirs, files in os.walk(backup_dir):
+                for filename in files:
+                    backup_file = os.path.join(root, filename)
+                    rel_path = os.path.relpath(backup_file, backup_dir)
+                    target_file = os.path.join(self.current_workspace, rel_path)
+                    
+                    # Restore file
+                    os.makedirs(os.path.dirname(target_file), exist_ok=True)
+                    shutil.copy2(backup_file, target_file)
+                    logger.info(f"Restored {rel_path} from backup")
+            
+            # Clean up backup after successful rollback
+            shutil.rmtree(backup_dir, ignore_errors=True)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Rollback failed: {e}")
+            return False

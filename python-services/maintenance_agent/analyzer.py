@@ -22,7 +22,8 @@ class WorkspaceAnalyzer:
         self, 
         project_id: str,
         files: List[Dict[str, Any]],
-        context: Optional[ContextSnapshot] = None
+        context: Optional[ContextSnapshot] = None,
+        custom_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Analyze workspace and return analysis results with semantic understanding
@@ -34,6 +35,7 @@ class WorkspaceAnalyzer:
             "semantic_clusters": [],
             "outdated": [],
             "improvements": [],
+            "custom_context": custom_context,  # Store for later use
             "stats": {
                 "total_files": len(files),
                 "by_type": defaultdict(int)

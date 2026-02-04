@@ -426,7 +426,7 @@ pub async fn get_suggestions(
 /// Accept a suggestion
 pub async fn accept_suggestion(
     Path((_project_id, suggestion_id)): Path<(String, String)>,
-) -> Result<StatusCode, StatusCode> {
+) -> Result<Json<serde_json::Value>, StatusCode> {
     let client = reqwest::Client::new();
     
     match client
@@ -435,8 +435,16 @@ pub async fn accept_suggestion(
         .await
     {
         Ok(response) if response.status().is_success() => {
-            tracing::info!("Accepted suggestion: {}", suggestion_id);
-            Ok(StatusCode::OK)
+            match response.json::<serde_json::Value>().await {
+                Ok(data) => {
+                    tracing::info!("Accepted suggestion: {}", suggestion_id);
+                    Ok(Json(data))
+                }
+                Err(e) => {
+                    tracing::error!("Failed to parse accept response: {}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
         }
         Ok(response) if response.status() == 404 => {
             tracing::warn!("Suggestion not found: {}", suggestion_id);
@@ -479,6 +487,7 @@ pub async fn dismiss_suggestion(
 pub async fn trigger_maintenance(
     State(state): State<Arc<RwLock<AppState>>>,
     Path(project_id): Path<String>,
+    Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let client = reqwest::Client::new();
     
@@ -510,11 +519,20 @@ pub async fn trigger_maintenance(
         format!("{}/.agent-workspace/projects/{}", home, project_id)
     };
     
+    // Build request with workspace path and optional custom message
+    let mut request_body = serde_json::json!({
+        "workspace_path": workspace_path
+    });
+    
+    if let Some(custom_message) = body.get("custom_message") {
+        if !custom_message.is_null() {
+            request_body["custom_message"] = custom_message.clone();
+        }
+    }
+    
     match client
         .post(&format!("{}/maintenance/trigger/{}", MAINTENANCE_SERVICE_URL, project_id))
-        .json(&serde_json::json!({
-            "workspace_path": workspace_path
-        }))
+        .json(&request_body)
         .send()
         .await
     {
