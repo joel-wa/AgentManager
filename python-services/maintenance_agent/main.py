@@ -47,24 +47,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize components
-cloud_client = CloudClient()
-analyzer = WorkspaceAnalyzer()
-summarizer = ContentSummarizer(cloud_client)
-project_paths = {}  # Store project_id -> workspace_path mapping
-context_tracker = ConversationContext()
-suggestion_store = SuggestionStore()
-recents_updater = RecentsUpdater()
-suggestion_executor = SuggestionExecutor(cloud_client)
-file_monitor = FileChangeMonitor(
-    context_tracker=context_tracker,
-    analyzer=analyzer,
-    cloud_client=cloud_client,
-    suggestion_store=suggestion_store,
-    recents_updater=recents_updater,
-    broadcast_callback=broadcast_suggestion_update
-)
-
 # SSE infrastructure for real-time updates
 sse_clients: Dict[str, List[asyncio.Queue]] = {}  # project_id -> list of queues
 
@@ -85,6 +67,25 @@ async def broadcast_suggestion_update(project_id: str, suggestion_data: dict):
     
     sse_clients[project_id] = active_clients
     logger.info(f"Broadcasted suggestion update to {len(active_clients)} clients for project {project_id}")
+
+
+# Initialize components
+cloud_client = CloudClient()
+analyzer = WorkspaceAnalyzer()
+summarizer = ContentSummarizer(cloud_client)
+project_paths = {}  # Store project_id -> workspace_path mapping
+context_tracker = ConversationContext()
+suggestion_store = SuggestionStore()
+recents_updater = RecentsUpdater()
+suggestion_executor = SuggestionExecutor(cloud_client)
+file_monitor = FileChangeMonitor(
+    context_tracker=context_tracker,
+    analyzer=analyzer,
+    cloud_client=cloud_client,
+    suggestion_store=suggestion_store,
+    recents_updater=recents_updater,
+    broadcast_callback=broadcast_suggestion_update
+)
 
 
 class AnalyzeRequest(BaseModel):

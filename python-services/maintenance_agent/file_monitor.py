@@ -27,7 +27,7 @@ class FileChangeMonitor:
         suggestion_store: SuggestionStore,
         recents_updater: RecentsUpdater,
         embeddings_url: str = "http://localhost:8003",
-        broadcast_callback = None
+        broadcast_callback=None
     ):
         self.context_tracker = context_tracker
         self.analyzer = analyzer
@@ -76,10 +76,9 @@ class FileChangeMonitor:
             for suggestion in suggestions:
                 self.suggestion_store.save_suggestion(suggestion)
                 
-                # Broadcast to SSE clients if callback provided
+                # Broadcast to SSE clients if callback is provided
                 if self.broadcast_callback:
-                    import asyncio
-                    asyncio.create_task(self.broadcast_callback(project_id, {
+                    await self.broadcast_callback(project_id, {
                         "type": "new_suggestion",
                         "suggestion": {
                             "id": suggestion.id,
@@ -91,7 +90,7 @@ class FileChangeMonitor:
                             "status": suggestion.status,
                             "created_at": suggestion.created_at.isoformat()
                         }
-                    }))
+                    })
                 
         except Exception as e:
             print(f"Error handling file change: {e}")
