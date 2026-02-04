@@ -317,7 +317,7 @@ async def get_suggestions(project_id: str):
     """Get pending suggestions for a project"""
     try:
         suggestions = suggestion_store.get_pending_suggestions(project_id)
-        return {
+        result = {
             "suggestions": [
                 {
                     "id": s.id,
@@ -332,7 +332,12 @@ async def get_suggestions(project_id: str):
                 for s in suggestions
             ]
         }
+        logger.info(f"Returning {len(suggestions)} suggestions for project {project_id}")
+        if suggestions:
+            logger.info(f"First suggestion: {suggestions[0].title}")
+        return result
     except Exception as e:
+        logger.error(f"Error getting suggestions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -456,6 +461,7 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
                 status="pending"
             )
             suggestion_store.save_suggestion(sug_model)
+            logger.info(f"Saved suggestion: {sug_model.title} (type={sug_model.type}, files={sug_model.affected_files})")
             
             # Broadcast to SSE clients
             await broadcast_suggestion_update(project_id, {

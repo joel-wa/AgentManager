@@ -396,13 +396,17 @@ pub async fn get_suggestions(
             if let Ok(data) = response.json::<serde_json::Value>().await {
                 if let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array()) {
                     let parsed: Vec<Suggestion> = suggestions.iter().filter_map(|s| {
+                        let sug_type = s.get("type")?.as_str()?;
                         Some(Suggestion {
                             id: s.get("id")?.as_str()?.to_string(),
-                            suggestion_type: match s.get("type")?.as_str()? {
+                            suggestion_type: match sug_type {
                                 "merge" => SuggestionType::Merge,
                                 "outdated" => SuggestionType::Outdated,
-                                "update" => SuggestionType::Update,
-                                _ => return None,
+                                "update" | "organize" | "move" | "modify" => SuggestionType::Update,
+                                _ => {
+                                    tracing::warn!("Unknown suggestion type: {}", sug_type);
+                                    return None;
+                                }
                             },
                             title: s.get("title")?.as_str()?.to_string(),
                             description: s.get("description")?.as_str()?.to_string(),
