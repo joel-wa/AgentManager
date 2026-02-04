@@ -335,7 +335,58 @@ class ApiService {
     }
     return '~/.agent-workspace';
   }
+
+  // SSE for real-time suggestion updates
+  subscribeSuggestions(projectId: string, onSuggestion: (data: any) => void): () => void {
+    const eventSource = new EventSource(`${this.baseUrl}/api/projects/${projectId}/suggestions/stream`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onSuggestion(data);
+      } catch (err) {
+        console.error('Failed to parse SSE data:', err);
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      console.error('SSE error:', err);
+      eventSource.close();
+    };
+    
+    // Return cleanup function
+    return () => {
+      eventSource.close();
+    };
+  }
 }
 
 // Export singleton instance
 export const api = new ApiService();
+
+  // SSE for real-time suggestion updates
+  subscribeSuggestions(projectId: string, onSuggestion: (data: any) => void): () => void {
+    const eventSource = new EventSource(`${this.baseUrl}/api/projects/${projectId}/suggestions/stream`);
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onSuggestion(data);
+      } catch (err) {
+        console.error('Failed to parse SSE data:', err);
+      }
+    };
+    
+    eventSource.onerror = (err) => {
+      console.error('SSE error:', err);
+      eventSource.close();
+    };
+    
+    // Return cleanup function
+    return () => {
+      eventSource.close();
+    };
+  }
+}
+
+export const api = new API();

@@ -5,12 +5,15 @@ Handles background workspace analysis and maintenance using cloud AI models
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uvicorn
 from datetime import datetime
 import uuid
 import logging
+import asyncio
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -58,8 +61,30 @@ file_monitor = FileChangeMonitor(
     analyzer=analyzer,
     cloud_client=cloud_client,
     suggestion_store=suggestion_store,
-    recents_updater=recents_updater
+    recents_updater=recents_updater,
+    broadcast_callback=broadcast_suggestion_update
 )
+
+# SSE infrastructure for real-time updates
+sse_clients: Dict[str, List[asyncio.Queue]] = {}  # project_id -> list of queues
+
+
+async def broadcast_suggestion_update(project_id: str, suggestion_data: dict):
+    """Broadcast a new suggestion to all connected SSE clients for a project"""
+    if project_id not in sse_clients:
+        return
+    
+    # Remove disconnected clients
+    active_clients = []
+    for queue in sse_clients[project_id]:
+        try:
+            queue.put_nowait(suggestion_data)
+            active_clients.append(queue)
+        except:
+            pass  # Client disconnected
+    
+    sse_clients[project_id] = active_clients
+    logger.info(f"Broadcasted suggestion update to {len(active_clients)} clients for project {project_id}")
 
 
 class AnalyzeRequest(BaseModel):
@@ -107,6 +132,71 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         cloud_available=cloud_available
+    )
+
+
+@app.get("/maintenance/suggestions/stream/{project_id}")
+async def stream_suggestions(project_id: str):
+    """SSE endpoint for real-time suggestion updates"""
+    
+    async def event_generator():
+        # Create a queue for this client
+        queue = asyncio.Queue()
+        
+        # Register client
+        if project_id not in sse_clients:
+            sse_clients[project_id] = []
+        sse_clients[project_id].append(queue)
+        
+        logger.info(f"SSE client connected for project {project_id}")
+        
+        try:
+            # Send initial suggestions
+            suggestions = suggestion_store.get_pending_suggestions(project_id)
+            if suggestions:
+                initial_data = {
+                    "type": "initial",
+                    "suggestions": [
+                        {
+                            "id": s.id,
+                            "type": s.type,
+                            "title": s.title,
+                            "description": s.description,
+                            "affected_files": s.affected_files,
+                            "priority": s.priority,
+                            "status": s.status,
+                            "created_at": s.created_at.isoformat()
+                        }
+                        for s in suggestions
+                    ]
+                }
+                yield f"data: {json.dumps(initial_data)}\n\n"
+            
+            # Keep connection alive and send updates
+            while True:
+                try:
+                    # Wait for new data with timeout for heartbeat
+                    data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send heartbeat to keep connection alive
+                    yield f": heartbeat\n\n"
+                    
+        except asyncio.CancelledError:
+            logger.info(f"SSE client disconnected for project {project_id}")
+        finally:
+            # Cleanup
+            if project_id in sse_clients and queue in sse_clients[project_id]:
+                sse_clients[project_id].remove(queue)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
     )
 
 
@@ -347,7 +437,7 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
         # Generate suggestions
         suggestions = await generate_suggestions(analysis_result)
         
-        # Save suggestions
+        # Save suggestions and broadcast to SSE clients
         for suggestion in suggestions:
             # Convert to SuggestionModel
             sug_model = SuggestionModel(
@@ -361,6 +451,21 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
                 status="pending"
             )
             suggestion_store.save_suggestion(sug_model)
+            
+            # Broadcast to SSE clients
+            await broadcast_suggestion_update(project_id, {
+                "type": "new_suggestion",
+                "suggestion": {
+                    "id": sug_model.id,
+                    "type": sug_model.type,
+                    "title": sug_model.title,
+                    "description": sug_model.description,
+                    "affected_files": sug_model.affected_files,
+                    "priority": sug_model.priority,
+                    "status": sug_model.status,
+                    "created_at": sug_model.created_at.isoformat()
+                }
+            })
         
         logger.info(f"Generated {len(suggestions)} suggestions")
         

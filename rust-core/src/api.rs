@@ -554,3 +554,57 @@ pub async fn trigger_maintenance(
         }
     }
 }
+
+/// Stream suggestions via SSE
+pub async fn stream_suggestions(
+    State(_state): State<Arc<RwLock<AppState>>>,
+    Path(project_id): Path<String>,
+) -> impl IntoResponse {
+    use axum::response::sse::{Event, Sse};
+    use futures::stream::Stream;
+    use std::convert::Infallible;
+    
+    tracing::info!("SSE client connecting for project: {}", project_id);
+    
+    let client = reqwest::Client::new();
+    let url = format!("{}/maintenance/suggestions/stream/{}", MAINTENANCE_SERVICE_URL, project_id);
+    
+    async fn stream_from_maintenance(url: String) -> impl Stream<Item = Result<Event, Infallible>> {
+        use futures::stream::StreamExt;
+        
+        let response = match reqwest::Client::new().get(&url).send().await {
+            Ok(resp) => resp,
+            Err(e) => {
+                tracing::error!("Failed to connect to maintenance SSE: {}", e);
+                return futures::stream::empty().boxed();
+            }
+        };
+        
+        let stream = response.bytes_stream();
+        
+        stream
+            .map(|result| {
+                match result {
+                    Ok(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes).to_string();
+                        // Parse SSE format
+                        for line in text.lines() {
+                            if line.starts_with("data: ") {
+                                let data = &line[6..];
+                                return Ok(Event::default().data(data));
+                            }
+                        }
+                        // Heartbeat
+                        Ok(Event::default().comment("heartbeat"))
+                    }
+                    Err(e) => {
+                        tracing::error!("Stream error: {}", e);
+                        Ok(Event::default().comment("error"))
+                    }
+                }
+            })
+            .boxed()
+    }
+    
+    Sse::new(stream_from_maintenance(url))
+}

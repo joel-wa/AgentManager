@@ -26,7 +26,8 @@ class FileChangeMonitor:
         cloud_client: CloudClient,
         suggestion_store: SuggestionStore,
         recents_updater: RecentsUpdater,
-        embeddings_url: str = "http://localhost:8003"
+        embeddings_url: str = "http://localhost:8003",
+        broadcast_callback = None
     ):
         self.context_tracker = context_tracker
         self.analyzer = analyzer
@@ -34,6 +35,7 @@ class FileChangeMonitor:
         self.suggestion_store = suggestion_store
         self.recents_updater = recents_updater
         self.embeddings_url = embeddings_url
+        self.broadcast_callback = broadcast_callback
     
     async def handle_file_change(
         self,
@@ -73,6 +75,23 @@ class FileChangeMonitor:
             # 5. Queue suggestions for user
             for suggestion in suggestions:
                 self.suggestion_store.save_suggestion(suggestion)
+                
+                # Broadcast to SSE clients if callback provided
+                if self.broadcast_callback:
+                    import asyncio
+                    asyncio.create_task(self.broadcast_callback(project_id, {
+                        "type": "new_suggestion",
+                        "suggestion": {
+                            "id": suggestion.id,
+                            "type": suggestion.type,
+                            "title": suggestion.title,
+                            "description": suggestion.description,
+                            "affected_files": suggestion.affected_files,
+                            "priority": suggestion.priority,
+                            "status": suggestion.status,
+                            "created_at": suggestion.created_at.isoformat()
+                        }
+                    }))
                 
         except Exception as e:
             print(f"Error handling file change: {e}")

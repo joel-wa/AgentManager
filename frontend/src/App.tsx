@@ -137,6 +137,45 @@ function App() {
       loadSuggestions()
       loadTimeline()
     }
+    
+    // Subscribe to real-time suggestion updates via SSE
+    if (!currentProject) return
+    
+    const unsubscribe = api.subscribeSuggestions(currentProject.id, (data) => {
+      console.log('SSE data received:', data)
+      
+      if (data.type === 'initial' && data.suggestions) {
+        // Initial batch of suggestions
+        setSuggestions(data.suggestions.map((s: any) => ({
+          id: s.id,
+          type: s.type,
+          title: s.title,
+          description: s.description,
+          affectedFiles: s.affected_files
+        })))
+      } else if (data.type === 'new_suggestion' && data.suggestion) {
+        // New suggestion added - add to existing list
+        const newSuggestion = {
+          id: data.suggestion.id,
+          type: data.suggestion.type,
+          title: data.suggestion.title,
+          description: data.suggestion.description,
+          affectedFiles: data.suggestion.affected_files
+        }
+        setSuggestions(prev => {
+          // Avoid duplicates
+          if (prev.some(s => s.id === newSuggestion.id)) {
+            return prev
+          }
+          return [...prev, newSuggestion]
+        })
+      }
+    })
+    
+    // Cleanup SSE connection on unmount or project change
+    return () => {
+      unsubscribe()
+    }
   }, [currentProject])
 
   const createNewTab = () => {

@@ -83,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/projects/:id/files/*path", post(api::write_file))
         .route("/projects/:id/timeline", get(api::get_timeline))
         .route("/projects/:id/suggestions", get(api::get_suggestions))
+        .route("/projects/:id/suggestions/stream", get(api::stream_suggestions))
         .route("/projects/:id/suggestions/:suggestion_id/accept", post(api::accept_suggestion))
         .route("/projects/:id/suggestions/:suggestion_id/dismiss", post(api::dismiss_suggestion))
         .route("/projects/:id/maintenance/trigger", post(api::trigger_maintenance))
