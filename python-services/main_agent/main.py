@@ -250,9 +250,9 @@ async def chat(request: ChatRequest):
                     # Format result based on type
                     if isinstance(tr.result, dict):
                         if 'content' in tr.result:
-                            # File content - show preview
-                            content = str(tr.result['content'])[:300]
-                            tool_results_text += f"File read successfully.\nContent: {content}...\n"
+                            # File content - show full content
+                            content = str(tr.result['content'])
+                            tool_results_text += f"File read successfully.\nContent:\n{content}\n"
                         elif 'entries' in tr.result:
                             # Directory listing
                             entries = tr.result['entries']
@@ -261,9 +261,9 @@ async def chat(request: ChatRequest):
                                 tool_results_text += "Items: " + ", ".join([e.get('name', '?') for e in entries[:10]]) + "\n"
                         else:
                             # Generic result
-                            tool_results_text += json.dumps(tr.result, indent=2)[:200] + "\n"
+                            tool_results_text += json.dumps(tr.result, indent=2) + "\n"
                     else:
-                        tool_results_text += f"{str(tr.result)[:200]}\n"
+                        tool_results_text += f"{str(tr.result)}\n"
                 else:
                     tool_results_text += f"ERROR: {tr.error}\n"
             
@@ -404,7 +404,7 @@ async def chat_stream(request: ChatRequest):
                 tool_results_text = "[TOOL RESULTS]\n"
                 for tc, result in zip(tool_calls, iteration_results):
                     if result.success:
-                        tool_results_text += f"\n{tc['name']}: {str(result.result)[:200]}\n"
+                        tool_results_text += f"\n{tc['name']}: {str(result.result)}\n"
                     else:
                         tool_results_text += f"\n{tc['name']}: ERROR: {result.error}\n"
                 
