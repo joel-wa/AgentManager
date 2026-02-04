@@ -434,8 +434,13 @@ async def trigger_maintenance(project_id: str, request: TriggerRequest):
             files=files
         )
         
-        # Generate suggestions
-        suggestions = await generate_suggestions(analysis_result)
+        # Generate suggestions - use AI if custom message provided
+        if request.custom_message:
+            suggestions = await generate_ai_suggestions(
+                project_id, analysis_result, files, project_path, request.custom_message
+            )
+        else:
+            suggestions = await generate_suggestions(analysis_result)
         
         # Save suggestions and broadcast to SSE clients
         for suggestion in suggestions:
@@ -522,6 +527,102 @@ async def generate_suggestions(analysis: Dict[str, Any]) -> List[Suggestion]:
         ))
     
     return suggestions
+
+
+async def generate_ai_suggestions(
+    project_id: str,
+    analysis: Dict[str, Any],
+    files: List[Dict[str, Any]],
+    project_path: str,
+    custom_message: str
+) -> List[Suggestion]:
+    """Generate AI-driven suggestions based on custom user message"""
+    import os
+    
+    # Read MAINTENANCE.md if exists
+    maintenance_rules = ""
+    maintenance_path = os.path.join(project_path, ".meta", "MAINTENANCE.md")
+    if os.path.exists(maintenance_path):
+        try:
+            with open(maintenance_path, 'r', encoding='utf-8') as f:
+                maintenance_rules = f"\n\nProject Maintenance Rules (from MAINTENANCE.md):\n{f.read()[:1500]}"
+        except Exception as e:
+            logger.error(f"Error reading MAINTENANCE.md: {e}")
+    
+    # Build context
+    file_list = [f.get('path', f.get('name', '')) for f in files[:50]]  # First 50 files
+    folders = set()
+    for f in files:
+        path = f.get('path', '')
+        if '/' in path or '\\' in path:
+            folder = os.path.dirname(path)
+            if folder:
+                folders.add(folder)
+    
+    prompt = f"""Analyze this workspace and suggest specific maintenance actions based on the user's request.
+
+User Request: "{custom_message}"
+
+Workspace Context:
+- Total files: {len(files)}
+- File types: {dict(analysis.get('stats', {}).get('by_type', {}))}
+- Folders: {', '.join(sorted(folders)[:10])}
+- Sample files: {', '.join(file_list[:20])}{maintenance_rules}
+
+CRITICAL RULES:
+1. RESPECT the Project Maintenance Rules above - if rules say NOT to suggest something, DO NOT suggest it
+2. Focus ONLY on what the user requested in their custom message
+3. Return empty array [] if no relevant suggestions for their request
+4. Be specific - include actual file names in affected_files
+
+Return ONLY valid JSON array:
+[
+  {{
+    "type": "update|move|merge|organize",
+    "title": "Short title",
+    "description": "Detailed explanation addressing user's request",
+    "affected_files": ["actual/file/path.ext"],
+    "priority": "high|medium|low"
+  }}
+]"""
+    
+    try:
+        response = await cloud_client.generate(
+            prompt,
+            system="You are a workspace maintenance expert. Return valid JSON array only. Respect user rules."
+        )
+        
+        # Parse response
+        response_clean = response.strip()
+        if response_clean.startswith('```json'):
+            response_clean = response_clean[7:]
+        if response_clean.startswith('```'):
+            response_clean = response_clean[3:]
+        if response_clean.endswith('```'):
+            response_clean = response_clean[:-3]
+        
+        import json
+        suggestions_data = json.loads(response_clean.strip())
+        
+        # Convert to Suggestion objects
+        suggestions = []
+        for s in suggestions_data:
+            suggestions.append(Suggestion(
+                id=str(uuid.uuid4()),
+                type=s.get('type', 'update'),
+                title=s.get('title', 'Maintenance suggestion'),
+                description=s.get('description', ''),
+                affected_files=s.get('affected_files', []),
+                priority=s.get('priority', 'medium')
+            ))
+        
+        logger.info(f"Generated {len(suggestions)} AI suggestions based on: {custom_message}")
+        return suggestions
+        
+    except Exception as e:
+        logger.error(f"Error generating AI suggestions: {e}")
+        # Fall back to basic analysis
+        return await generate_suggestions(analysis)
 
 
 if __name__ == "__main__":

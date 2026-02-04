@@ -216,23 +216,35 @@ Return ONLY valid JSON in this exact format:
             maintenance_rules = await self._read_maintenance_config(project_id)
             
             # Ask AI for suggestions
-            prompt = f"""Analyze this file change and suggest maintenance actions:
+            prompt = f"""Analyze this file change and suggest maintenance actions IF NEEDED:
 
 File Changed: {file_path}
 Change Type: {change_type}{content_preview}{structure_info}{readme_info}{maintenance_rules}
 
-Suggest up to 3 maintenance actions from:
-1. Update README - if the change should be reflected in project documentation
-2. Move file - if the file would fit better in a different folder
-3. Merge files - if this file is similar to existing files
-4. Update other files - if related files need corresponding changes
+IMPORTANT: Respect the Project Maintenance Rules above. If the rules specify not to suggest certain actions, DO NOT suggest them.
 
-Return ONLY valid JSON array:
+Only suggest maintenance actions if there is a genuine need based on:
+- File duplication or similarity that could cause confusion
+- Files in incorrect locations that would benefit from reorganization
+- Breaking changes that require updates to related files
+- Significant structural changes that warrant documentation updates
+
+DO NOT suggest README updates unless:
+- There is a NEW major feature or architectural change
+- The current README is significantly outdated or incorrect
+- The user explicitly requested documentation updates
+
+Possible action types:
+- "update": Update README or other documentation / Update related files for consistency
+- "move": Relocate file to better location
+- "merge": Combine similar/duplicate files
+
+Return ONLY valid JSON array (empty array [] if no suggestions needed):
 [
   {{
     "type": "update|move|merge",
     "title": "Short title",
-    "description": "Detailed explanation",
+    "description": "Detailed explanation of why this is needed",
     "affected_files": ["file1.txt", "file2.txt"],
     "priority": "high|medium|low"
   }}
@@ -242,6 +254,8 @@ Return ONLY valid JSON array:
                 prompt,
                 system="You are a workspace organization expert. Return valid JSON array only."
             )
+            
+            print(f"[DEBUG] AI Response for {file_path}: {response[:200]}...")
             
             # Parse suggestions
             response_clean = response.strip()
@@ -254,6 +268,7 @@ Return ONLY valid JSON array:
             
             import json
             suggestions_data = json.loads(response_clean.strip())
+            print(f"[DEBUG] Parsed suggestions: {suggestions_data}")
             
             # Convert to Suggestion objects
             for s in suggestions_data:

@@ -166,13 +166,8 @@ class WorkspaceAnalyzer:
                     "files": None
                 })
         
-        # Suggest README update if many files
-        if result["stats"]["total_files"] > 10:
-            improvements.append({
-                "title": "Update README",
-                "description": "Consider updating README to reflect current project structure",
-                "files": ["README.md"]
-            })
+        # Note: README suggestions are now only generated based on actual need
+        # and respect user instructions in MAINTENANCE.md
         
         return improvements
     
