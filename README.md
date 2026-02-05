@@ -39,7 +39,7 @@ The system consists of three main components:
 
 - **Chat-First Interface**: Clean, minimal chat with your local AI agent
 - **Persistent Memory**: Files and notes are stored in organized workspaces
-- **File Version Tracking**: Automatic version control for all file changes with restore capability
+- **Git-Based Version Tracking**: Every project has automatic Git version control - industry standard, robust, and efficient
 - **Tool Usage Transparency**: See exactly what the agent is doing
 - **Background Maintenance**: Cloud AI keeps your workspace organized
 - **Timeline View**: Track your session history and file changes
@@ -194,60 +194,82 @@ python main.py                    # Run service
 python -m pytest                  # Run tests
 ```
 
-## File Version Tracking
+## Git-Based Version Tracking
 
-AgentManager automatically tracks all file changes made by the agent, similar to Git or Mercurial. Every time a file is modified, the previous version is saved, allowing you to review and restore previous states.
+AgentManager uses **Git** for automatic version control. Each project gets its own Git repository that tracks all file changes made by the agent.
 
 ### How It Works
 
-- **Automatic Versioning**: When the agent modifies a file, the previous content is automatically saved as a version
-- **Version Storage**: Versions are stored in `.meta/versions/` within each project directory
-- **Content Hashing**: Each version includes a SHA256 hash for integrity verification
-- **Metadata**: Timestamps, file size, and optional messages are tracked for each version
+- **Auto-Commit**: Every file modification is automatically committed to Git
+- **Project-Wide Tracking**: Git tracks the entire project, not just individual files
+- **Standard Git Repository**: Each project has a `.git` directory with full version history
+- **Industry Standard**: Leverages the battle-tested Git version control system
+
+### Benefits
+
+- ✅ **Robust**: Battle-tested Git handles all edge cases
+- ✅ **Efficient**: Delta compression minimizes storage
+- ✅ **Standard**: Use any Git tool to inspect history
+- ✅ **Professional**: Same VCS used by millions of developers
 
 ### API Endpoints
+
+The REST API provides access to Git history:
 
 #### List All Versions of a File
 ```bash
 GET /api/projects/:id/versions/:path
 ```
 
-Returns version history including metadata for all versions.
+Returns version history from Git commits.
 
 #### Get a Specific Version
 ```bash
 GET /api/projects/:id/version/:version/:path
 ```
 
-Retrieves the content and metadata for a specific version number.
+Retrieves content from a specific Git commit.
 
 #### Restore a File to a Previous Version
 ```bash
 POST /api/projects/:id/restore/:version/:path
 ```
 
-Restores the file to a previous version. The current content is saved as a new version before restoration.
+Restores file content from a previous Git commit.
 
 ### Example Usage
 
 ```bash
-# List versions of a file
+# List versions of a file (via API)
 curl http://localhost:8000/api/projects/PROJECT_ID/versions/myfile.txt
 
-# Get version 2
-curl http://localhost:8000/api/projects/PROJECT_ID/version/2/myfile.txt
-
-# Restore to version 1
-curl -X POST http://localhost:8000/api/projects/PROJECT_ID/restore/1/myfile.txt
+# Or use Git directly
+cd ~/.agent-workspace/projects/PROJECT_ID
+git log --oneline
+git show {commit-hash}:myfile.txt
 ```
 
-### Testing
+### Advanced: Direct Git Access
 
-Run the included test suite to verify version tracking:
+Since each project is a Git repository, you can use standard Git commands:
 
 ```bash
-python test_version_tracking.py
+cd ~/.agent-workspace/projects/{PROJECT_ID}
+
+# View commit history
+git log --all --graph --oneline
+
+# See what changed in a commit
+git show {commit-hash}
+
+# View file at specific commit
+git show {commit-hash}:path/to/file.txt
+
+# Create a branch for experiments
+git checkout -b experiment
 ```
+
+See `GIT_INTEGRATION.md` for complete documentation.
 
 ## License
 
