@@ -107,7 +107,11 @@ async def chat(request: ChatRequest):
         print(f"[PROJECT] Working directory: {project_working_dir}")
         
         # Create project-specific tool executor
-        project_tool_executor = ToolExecutor(working_directory=project_working_dir)
+        project_tool_executor = ToolExecutor(
+            working_directory=project_working_dir,
+            project_id=request.project_id,
+            rust_core_url="http://localhost:8000"
+        )
         
         # Get full tool schemas
         tool_schemas = project_tool_executor.get_tool_schemas() if request.tools else []

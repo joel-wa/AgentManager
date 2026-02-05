@@ -22,7 +22,7 @@ def test_create_project():
     print_section("Creating Test Project")
     
     response = requests.post(f"{BASE_URL}/projects", json={
-        "name": "Version Tracking Test",
+        "name": "Version Tracking Test 2",
         "description": "Testing file version tracking feature"
     })
     

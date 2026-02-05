@@ -251,6 +251,9 @@ class WriteFileTool(BaseTool):
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
         content = args.get("content", "")
+        project_id = args.get("_project_id")
+        rust_core_url = args.get("_rust_core_url", "http://localhost:8000")
+        working_directory = args.get("_working_directory")
         
         if not path:
             return ToolResult(
@@ -259,6 +262,51 @@ class WriteFileTool(BaseTool):
                 error="No path provided"
             )
         
+        # If we have a project_id, use Rust Core API for version tracking
+        if project_id and working_directory:
+            try:
+                # Calculate relative path from working directory
+                abs_path = path if os.path.isabs(path) else path
+                if os.path.isabs(abs_path) and working_directory:
+                    # Make path relative to project root
+                    rel_path = os.path.relpath(abs_path, working_directory)
+                else:
+                    rel_path = path
+                
+                # Call Rust Core API
+                import httpx
+                from urllib.parse import quote
+                
+                api_url = f"{rust_core_url}/api/projects/{project_id}/files/{quote(rel_path, safe='')}"
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        api_url,
+                        content=content,
+                        headers={"Content-Type": "text/plain"}
+                    )
+                    
+                    if response.status_code == 200:
+                        return ToolResult(
+                            success=True,
+                            result={
+                                "path": rel_path,
+                                "content_length": len(content),
+                                "bytes_written": len(content.encode('utf-8')),
+                                "version_tracked": True
+                            }
+                        )
+                    else:
+                        return ToolResult(
+                            success=False,
+                            result=None,
+                            error=f"API error: {response.status_code} - {response.text}"
+                        )
+            except Exception as e:
+                # Fall back to direct file write if API fails
+                print(f"[WRITE_FILE] API call failed, falling back to direct write: {e}")
+        
+        # Fallback: Direct file write (no version tracking)
         try:
             # Ensure parent directory exists
             parent_dir = os.path.dirname(path)
@@ -279,7 +327,8 @@ class WriteFileTool(BaseTool):
                 result={
                     "path": path,
                     "content_length": len(content),
-                    "bytes_written": len(content.encode('utf-8'))
+                    "bytes_written": len(content.encode('utf-8')),
+                    "version_tracked": False
                 }
             )
         except PermissionError:
@@ -790,8 +839,10 @@ class ToolRegistry:
 class ToolExecutor:
     """Executes tools and returns results"""
     
-    def __init__(self, working_directory: Optional[str] = None):
+    def __init__(self, working_directory: Optional[str] = None, project_id: Optional[str] = None, rust_core_url: str = "http://localhost:8000"):
         self._working_directory = working_directory
+        self._project_id = project_id
+        self._rust_core_url = rust_core_url
         self.registry = ToolRegistry(working_directory=working_directory)
     
     def _resolve_path(self, path: str) -> str:
@@ -833,6 +884,12 @@ class ToolExecutor:
             # Default working directory for execute_command
             if tool_name == 'execute_command' and 'working_directory' not in resolved_args:
                 resolved_args['working_directory'] = self._working_directory
+        
+        # Inject project_id and rust_core_url for write_file tool
+        if tool_name == 'write_file':
+            resolved_args['_project_id'] = self._project_id
+            resolved_args['_rust_core_url'] = self._rust_core_url
+            resolved_args['_working_directory'] = self._working_directory
         
         try:
             result = await tool.execute(resolved_args)
