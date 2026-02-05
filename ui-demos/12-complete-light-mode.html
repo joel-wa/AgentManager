@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Manager - Complete Light Mode UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            color: #1a1a1a;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ===== FILE BROWSER (Demo 3 - Recolored to Light) ===== */
+        .file-browser {
+            width: 320px;
+            background: rgba(235, 235, 235, 0.6);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .browser-header {
+            padding: 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .header-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: -0.3px;
+            color: rgba(0, 0, 0, 0.9);
+        }
+
+        /* Search Bar */
+        .search-bar {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 36px;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+            color: #1a1a1a;
+            font-size: 13px;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+        }
+
+        .search-input::placeholder {
+            color: rgba(0, 0, 0, 0.3);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .action-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            color: rgba(0, 0, 0, 0.7);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+            border-color: rgba(0, 0, 0, 0.12);
+            color: #1a1a1a;
+            transform: translateY(-1px);
+        }
+
+        /* File Tree */
+        .file-tree {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+        }
+
+        .file-tree::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .file-tree::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .file-tree::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        /* Folder/File Item */
+        .tree-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            user-select: none;
+        }
+
+        .tree-item:hover {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        .tree-item.selected {
+            background: rgba(59, 130, 246, 0.15);
+            color: #2563eb;
+        }
+
+        .tree-item.folder {
+            font-weight: 500;
+        }
+
+        /* Chevron for expandable folders */
+        .chevron {
+            width: 16px;
+            height: 16px;
+            color: rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .tree-item.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        /* Icons */
+        .icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .icon.folder {
+            color: #3b82f6;
+        }
+
+        .icon.file {
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        .icon.code {
+            color: #10b981;
+        }
+
+        .icon.json {
+            color: #f59e0b;
+        }
+
+        /* Item Name */
+        .item-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Nested items indentation */
+        .nested {
+            margin-left: 24px;
+        }
+
+        /* Status Footer */
+        .browser-footer {
+            padding: 12px 16px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            font-size: 11px;
+            color: rgba(0, 0, 0, 0.4);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ===== CHAT INTERFACE (Demo 2 - Recolored to Light) ===== */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 24px;
+        }
+
+        /* Messages Area */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 48px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        /* Smooth scrollbar */
+        .messages-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        /* Message Bubble */
+        .message {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Avatar */
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .avatar.user {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: #fff;
+        }
+
+        .avatar.assistant {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            color: #fff;
+        }
+
+        /* Message Content */
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(0, 0, 0, 0.9);
+            letter-spacing: -0.1px;
+        }
+
+        .message-text p {
+            margin-bottom: 12px;
+        }
+
+        .message-text p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            color: #1e293b;
+        }
+
+        /* ===== TOOL ACTIVITY (Demo 7 Streaming - Recolored to Light) ===== */
+        /* Real-time Tool Execution (Streaming) */
+        .tool-streaming {
+            margin-top: 12px;
+            padding: 16px;
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+        }
+
+        .streaming-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .streaming-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .streaming-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: #3b82f6;
+        }
+
+        .streaming-log {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.7);
+            line-height: 1.6;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        /* Tool Activity Panel - Expanded View */
+        .tool-activity-expanded {
+            margin-top: 12px;
+            background: rgba(235, 235, 235, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            animation: expandPanel 0.3s ease;
+        }
+
+        @keyframes expandPanel {
+            from {
+                opacity: 0;
+                transform: scaleY(0.95);
+                transform-origin: top;
+            }
+            to {
+                opacity: 1;
+                transform: scaleY(1);
+            }
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.02);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+            color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Tool Activity Items */
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            animation: toolItemIn 0.3s ease;
+        }
+
+        @keyframes toolItemIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .tool-item:hover {
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .tool-icon.search {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+        }
+
+        .tool-icon.read {
+            background: rgba(52, 211, 153, 0.15);
+            color: #10b981;
+        }
+
+        .tool-icon.write {
+            background: rgba(251, 146, 60, 0.15);
+            color: #f97316;
+        }
+
+        .tool-icon.execute {
+            background: rgba(167, 139, 250, 0.15);
+            color: #8b5cf6;
+        }
+
+        .tool-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-description {
+            font-size: 14px;
+            color: rgba(0, 0, 0, 0.9);
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        .tool-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+        }
+
+        .tool-time {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tool-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Input Container */
+        .input-container {
+            padding: 24px 0;
+            position: sticky;
+            bottom: 0;
+            background: linear-gradient(180deg, transparent 0%, #f5f5f5 20%);
+        }
+
+        /* Mentioned Files Pills */
+        .mentioned-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .file-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 20px;
+            font-size: 13px;
+            color: #3b82f6;
+            transition: all 0.2s ease;
+        }
+
+        .file-pill:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .file-pill-close {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background 0.2s ease;
+        }
+
+        .file-pill-close:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        /* Input Wrapper */
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.04);
+            border: 1.5px solid rgba(0, 0, 0, 0.08);
+            border-radius: 16px;
+            padding: 12px 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .input-wrapper:focus-within {
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        /* Attach Button */
+        .attach-button {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .attach-button:hover {
+            background: rgba(0, 0, 0, 0.08);
+            color: rgba(0, 0, 0, 0.9);
+        }
+
+        /* Input Field */
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #1a1a1a;
+            font-size: 15px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            line-height: 1.5;
+            max-height: 200px;
+        }
+
+        textarea::placeholder {
+            color: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Send Button */
+        .send-button {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .send-button:active {
+            transform: scale(0.95);
+        }
+
+        .send-button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Helper Text */
+        .helper-text {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.3);
+            margin-top: 8px;
+        }
+
+        /* Icons */
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Loading indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 16px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            animation: typing 1.4s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- File Browser Sidebar -->
+    <div class="file-browser">
+        <!-- Header with Search -->
+        <div class="browser-header">
+            <h3 class="header-title">Files</h3>
+            <div class="search-bar">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    placeholder="Search files..."
+                    id="searchInput"
+                />
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button class="action-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                New
+            </button>
+            <button class="action-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+                    <path d="M21 3v5h-5"/>
+                </svg>
+                Refresh
+            </button>
+        </div>
+
+        <!-- File Tree -->
+        <div class="file-tree" id="fileTree">
+            <!-- Folder: src -->
+            <div class="tree-item folder expanded" onclick="toggleFolder(this)">
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6"/>
+                </svg>
+                <svg class="icon folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span class="item-name">src</span>
+            </div>
+            <div class="nested">
+                <!-- Folder: components -->
+                <div class="tree-item folder expanded" onclick="toggleFolder(this)">
+                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                    <svg class="icon folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="item-name">components</span>
+                </div>
+                <div class="nested">
+                    <div class="tree-item selected">
+                        <svg class="icon code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                        </svg>
+                        <span class="item-name">ChatInterface.tsx</span>
+                    </div>
+                    <div class="tree-item">
+                        <svg class="icon code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                        </svg>
+                        <span class="item-name">FileBrowser.tsx</span>
+                    </div>
+                    <div class="tree-item">
+                        <svg class="icon code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                        </svg>
+                        <span class="item-name">TopBar.tsx</span>
+                    </div>
+                </div>
+
+                <!-- Folder: services -->
+                <div class="tree-item folder" onclick="toggleFolder(this)">
+                    <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                    <svg class="icon folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="item-name">services</span>
+                </div>
+
+                <!-- File: App.tsx -->
+                <div class="tree-item">
+                    <svg class="icon code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                    </svg>
+                    <span class="item-name">App.tsx</span>
+                </div>
+            </div>
+
+            <!-- File: package.json -->
+            <div class="tree-item">
+                <svg class="icon json" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span class="item-name">package.json</span>
+            </div>
+
+            <!-- File: README.md -->
+            <div class="tree-item">
+                <svg class="icon file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                </svg>
+                <span class="item-name">README.md</span>
+            </div>
+        </div>
+
+        <!-- Footer with Stats -->
+        <div class="browser-footer">
+            <span>12 items</span>
+            <span>842 KB</span>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <!-- Messages Area -->
+        <div class="messages-area" id="messages">
+            <!-- Assistant Message -->
+            <div class="message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Hello! I'm your AI workspace assistant. I can help you organize notes, search through your files, and maintain your knowledge base.</p>
+                        <p>What would you like to work on today?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Can you analyze the ChatInterface component and suggest improvements?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant with Real-time Streaming Tools -->
+            <div class="message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I'm analyzing your component structure now...</p>
+                    </div>
+
+                    <!-- Real-time Streaming Tool Activity -->
+                    <div class="tool-streaming">
+                        <div class="streaming-header">
+                            <div class="streaming-spinner"></div>
+                            <span class="streaming-text">Analyzing codebase...</span>
+                        </div>
+                        <div class="streaming-log">
+                            $ semantic_search "ChatInterface patterns"<br>
+                            ✓ Found 8 matching patterns<br>
+                            $ read_file src/components/ChatInterface.tsx<br>
+                            <span style="color: rgba(0,0,0,0.5);">$ analyzing component structure...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant with Completed Tool Activity -->
+            <div class="message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've analyzed your ChatInterface component. Here's what I found and the improvements I recommend:</p>
+                        <div class="code-block">// Suggested improvement: Add memoization
+const ChatInterface = React.memo(({ messages, onSend }) => {
+  // Component implementation
+});</div>
+                    </div>
+
+                    <!-- Expanded Tool Activity Panel -->
+                    <div class="tool-activity-expanded">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"/>
+                                    <rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="14" y="14" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                                Agent Activity Log
+                            </div>
+                            <button class="close-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 6L6 18M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="tool-items">
+                            <!-- Search Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon search">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <path d="m21 21-4.35-4.35"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Searched codebase for ChatInterface patterns
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:34 PM
+                                        </span>
+                                        <span>•</span>
+                                        <span>8 files matched</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Read Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon read">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <path d="M14 2v6h6"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Read ChatInterface component source
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-file">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                                            </svg>
+                                            src/components/ChatInterface.tsx
+                                        </span>
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:34 PM
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Write Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon write">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Created improvement suggestions document
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-file">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                            </svg>
+                                            docs/chat-improvements.md
+                                        </span>
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:35 PM
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Container -->
+        <div class="input-container">
+            <!-- Mentioned Files -->
+            <div class="mentioned-files">
+                <div class="file-pill">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                    <span>ChatInterface.tsx</span>
+                    <div class="file-pill-close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Wrapper -->
+            <div class="input-wrapper">
+                <button class="attach-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                </button>
+                
+                <textarea 
+                    rows="1" 
+                    placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
+                    id="messageInput"
+                ></textarea>
+                
+                <button class="send-button" id="sendButton">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m22 2-7 20-4-9-9-4Z"/>
+                        <path d="M22 2 11 13"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="helper-text">
+                Pro tip: Use @ to mention files • Shift+Enter for new line
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Folder toggle
+        function toggleFolder(element) {
+            element.classList.toggle('expanded');
+            const nested = element.nextElementSibling;
+            if (nested && nested.classList.contains('nested')) {
+                nested.style.display = nested.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // File selection
+        document.querySelectorAll('.tree-item:not(.folder)').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.tree-item').forEach(item => {
+                const name = item.querySelector('.item-name').textContent.toLowerCase();
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        // Auto-resize textarea
+        const textarea = document.getElementById('messageInput');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // Send message on Enter (without Shift)
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Send button click
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+
+        function sendMessage() {
+            const text = textarea.value.trim();
+            if (text) {
+                const messagesArea = document.getElementById('messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message';
+                messageDiv.innerHTML = `
+                    <div class="avatar user">YO</div>
+                    <div class="message-content">
+                        <div class="message-text">
+                            <p>${text}</p>
+                        </div>
+                    </div>
+                `;
+                messagesArea.appendChild(messageDiv);
+                
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+
+                // Show typing indicator
+                setTimeout(() => {
+                    const typingDiv = document.createElement('div');
+                    typingDiv.className = 'message';
+                    typingDiv.innerHTML = `
+                        <div class="avatar assistant">AI</div>
+                        <div class="message-content">
+                            <div class="typing-indicator">
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                            </div>
+                        </div>
+                    `;
+                    messagesArea.appendChild(typingDiv);
+                    messagesArea.scrollTop = messagesArea.scrollHeight;
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>

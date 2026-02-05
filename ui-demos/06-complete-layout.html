@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Premium UI - Full Layout</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Main Layout */
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar */
+        .topbar {
+            height: 56px;
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .brand-name {
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: -0.3px;
+        }
+
+        .center-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .project-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .project-button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
+
+        .right-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #22c55e;
+        }
+
+        .health-dot {
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.95); }
+        }
+
+        .icon-button {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .icon-button:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(15, 15, 15, 0.6);
+            backdrop-filter: blur(40px);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .sidebar-nav {
+            display: flex;
+            gap: 4px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 8px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .nav-tab:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .nav-tab.active {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .file-item.selected {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 48px 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .messages-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .avatar.user {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+
+        .avatar.assistant {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 24px;
+            background: linear-gradient(180deg, transparent 0%, #1e1e1e 20%);
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 12px 16px;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 15px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            line-height: 1.5;
+            max-height: 200px;
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .send-button {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Toggle Sidebar Button */
+        .toggle-sidebar {
+            position: absolute;
+            left: 280px;
+            top: 16px;
+            width: 32px;
+            height: 32px;
+            background: rgba(20, 20, 20, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .sidebar.collapsed ~ .chat-area .toggle-sidebar {
+            left: 16px;
+        }
+
+        .toggle-sidebar:hover {
+            background: rgba(30, 30, 30, 0.9);
+        }
+
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Bar -->
+        <nav class="topbar">
+            <div class="logo-section">
+                <div class="logo">A</div>
+                <span class="brand-name">Agent Manager</span>
+            </div>
+
+            <div class="center-section">
+                <button class="project-button">
+                    <span>Enterprise Dashboard</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="right-section">
+                <div class="health-indicator">
+                    <div class="health-dot"></div>
+                    <span>All Systems Operational</span>
+                </div>
+                
+                <button class="icon-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                </button>
+
+                <button class="icon-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M12 1v6m0 6v6M1 12h6m6 0h6"/>
+                    </svg>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-nav">
+                        <button class="nav-tab active">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                            </svg>
+                            Files
+                        </button>
+                        <button class="nav-tab">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="m21 21-4.35-4.35"/>
+                            </svg>
+                            Search
+                        </button>
+                        <button class="nav-tab">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                            </svg>
+                            Timeline
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sidebar-content">
+                    <div class="file-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>src</span>
+                    </div>
+                    <div class="file-item selected" style="margin-left: 24px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                        </svg>
+                        <span>App.tsx</span>
+                    </div>
+                    <div class="file-item" style="margin-left: 24px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span>components</span>
+                    </div>
+                    <div class="file-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <path d="M14 2v6h6"/>
+                        </svg>
+                        <span>README.md</span>
+                    </div>
+                    <div class="file-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span>package.json</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="chat-area">
+                <button class="toggle-sidebar" onclick="toggleSidebar()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+                    </svg>
+                </button>
+
+                <div class="messages-container">
+                    <div class="message">
+                        <div class="avatar assistant">AI</div>
+                        <div class="message-content">
+                            <div class="message-text">
+                                <p>Welcome to your modern workspace. I'm here to help you manage your projects, organize files, and boost your productivity.</p>
+                                <p style="margin-top: 12px;">What would you like to work on today?</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message">
+                        <div class="avatar user">YO</div>
+                        <div class="message-content">
+                            <div class="message-text">
+                                <p>Show me the architecture of this application.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="message">
+                        <div class="avatar assistant">AI</div>
+                        <div class="message-content">
+                            <div class="message-text">
+                                <p>I'll analyze the application architecture for you. The system consists of:</p>
+                                <p style="margin-top: 12px;">• <strong>Frontend</strong>: React + TypeScript with Vite</p>
+                                <p>• <strong>Backend</strong>: Rust core with Python services</p>
+                                <p>• <strong>AI Layer</strong>: Multiple specialized agents</p>
+                                <p style="margin-top: 12px;">Would you like me to dive deeper into any specific component?</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <div class="input-wrapper">
+                        <button class="icon-button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                            </svg>
+                        </button>
+                        
+                        <textarea 
+                            rows="1" 
+                            placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
+                        ></textarea>
+                        
+                        <button class="send-button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m22 2-7 20-4-9-9-4Z"/>
+                                <path d="M22 2 11 13"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        // Auto-resize textarea
+        const textarea = document.querySelector('textarea');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+    </script>
+</body>
+</html>

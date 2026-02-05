@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realistic Tool Activity Display - Dynamic Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 48px 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 32px;
+        }
+
+        /* Message Structure */
+        .message {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 12px;
+        }
+
+        /* APPROACH 1: Emoji-Based (Backend sends emoji) */
+        .tool-activity-compact {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-activity-compact:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .compact-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .compact-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .compact-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tool-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+        }
+
+        .tool-chip:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .tool-emoji {
+            font-size: 14px;
+        }
+
+        /* APPROACH 2: Generic Icon with Color Coding */
+        .tool-activity-expanded {
+            margin-top: 12px;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            animation: expandPanel 0.3s ease;
+        }
+
+        @keyframes expandPanel {
+            from { opacity: 0; transform: scaleY(0.95); }
+            to { opacity: 1; transform: scaleY(1); }
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Generic tool icon - same for all, color indicates status */
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        /* Or use emoji directly */
+        .tool-icon-emoji {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 18px;
+        }
+
+        .tool-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 4px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        .tool-description {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .tool-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+        }
+
+        /* APPROACH 3: Minimalist - No icons, just clean text */
+        .tool-list-simple {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+        }
+
+        .tool-list-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .simple-tool-item {
+            padding: 8px 12px;
+            border-left: 2px solid rgba(59, 130, 246, 0.3);
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+        }
+
+        .simple-tool-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .simple-tool-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 2px;
+        }
+
+        .simple-tool-desc {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* APPROACH 4: Inline text format (ChatGPT style) */
+        .tool-inline {
+            margin-top: 8px;
+            padding: 12px;
+            background: rgba(59, 130, 246, 0.05);
+            border-left: 3px solid rgba(59, 130, 246, 0.4);
+            border-radius: 6px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+        }
+
+        .tool-inline-item {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .tool-inline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-inline-bullet {
+            color: #60a5fa;
+            font-weight: bold;
+        }
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .demo-section {
+            margin-bottom: 48px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .section-desc {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 16px;
+        }
+
+        .code-example {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            color: #a5d6ff;
+            margin-top: 16px;
+            overflow-x: auto;
+        }
+
+        .highlight {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Realistic Tool Activity Display</h1>
+        <p class="subtitle">Production-ready approaches that work with any tool names</p>
+
+        <!-- APPROACH 1: Backend sends emoji -->
+        <div class="demo-section">
+            <h2 class="section-title">Approach 1: Emoji-Based (Recommended)</h2>
+            <p class="section-desc">Backend sends an emoji with each tool call. Universal, no icon library needed.</p>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've analyzed your codebase and found potential improvements.</p>
+                    </div>
+
+                    <div class="tool-activity-compact">
+                        <div class="compact-header">
+                            <span class="compact-title">🤖 Tools Used</span>
+                            <span class="tool-badge">5</span>
+                        </div>
+                        <div class="compact-tools">
+                            <div class="tool-chip">
+                                <span class="tool-emoji">🔍</span>
+                                <span>semantic_search</span>
+                            </div>
+                            <div class="tool-chip">
+                                <span class="tool-emoji">📄</span>
+                                <span>read_file</span>
+                            </div>
+                            <div class="tool-chip">
+                                <span class="tool-emoji">📝</span>
+                                <span>edit_file</span>
+                            </div>
+                            <div class="tool-chip">
+                                <span class="tool-emoji">✅</span>
+                                <span>run_tests</span>
+                            </div>
+                            <div class="tool-chip">
+                                <span class="tool-emoji">🐛</span>
+                                <span>debug_trace</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-example">
+<span class="highlight">// Backend sends:</span>
+{
+  "tool_calls": [
+    {
+      "name": "semantic_search",
+      "emoji": "🔍",  <span class="highlight">// Backend provides emoji</span>
+      "description": "Searched for auth patterns",
+      "timestamp": "2024-02-05T14:34:12Z"
+    }
+  ]
+}
+            </div>
+        </div>
+
+        <!-- APPROACH 2: Generic icon, rely on tool name -->
+        <div class="demo-section">
+            <h2 class="section-title">Approach 2: Generic Icon + Tool Name</h2>
+            <p class="section-desc">Same icon for all tools, let the tool name speak for itself.</p>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've completed the refactoring task.</p>
+                    </div>
+
+                    <div class="tool-activity-expanded">
+                        <div class="panel-header">
+                            <div class="panel-title">Tool Activity</div>
+                        </div>
+
+                        <div class="tool-items">
+                            <!-- All use same icon -->
+                            <div class="tool-item">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-name">grep_search</div>
+                                    <div class="tool-description">
+                                        Searched for authentication patterns in workspace
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span>2:34 PM</span>
+                                        <span>•</span>
+                                        <span>14 matches</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tool-item">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-name">replace_string_in_file</div>
+                                    <div class="tool-description">
+                                        Updated authentication error handling in src/auth/index.ts
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-file">📄 src/auth/index.ts</span>
+                                        <span>2:34 PM</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tool-item">
+                                <div class="tool-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"/>
+                                        <rect x="14" y="3" width="7" height="7"/>
+                                        <rect x="14" y="14" width="7" height="7"/>
+                                        <rect x="3" y="14" width="7" height="7"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-name">run_in_terminal</div>
+                                    <div class="tool-description">
+                                        Executed: npm run type-check
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span>2:35 PM</span>
+                                        <span>•</span>
+                                        <span style="color: #34d399;">✓ Success</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-example">
+<span class="highlight">// Simple data structure:</span>
+{
+  "tool_calls": [
+    {
+      "name": "grep_search",  <span class="highlight">// Tool name is descriptive enough</span>
+      "description": "Searched for auth patterns",
+      "args": { "query": "authenticate", "isRegexp": false }
+    }
+  ]
+}
+            </div>
+        </div>
+
+        <!-- APPROACH 3: Minimalist text-only -->
+        <div class="demo-section">
+            <h2 class="section-title">Approach 3: Minimalist Text-Only</h2>
+            <p class="section-desc">No icons, just clean presentation. Best for enterprise/professional look.</p>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Analysis complete. I've identified 3 optimization opportunities.</p>
+                    </div>
+
+                    <div class="tool-list-simple">
+                        <div class="tool-list-header">Tools Executed</div>
+                        <div class="simple-tool-item">
+                            <div class="simple-tool-name">semantic_search</div>
+                            <div class="simple-tool-desc">Found 12 files matching query "performance bottleneck"</div>
+                        </div>
+                        <div class="simple-tool-item">
+                            <div class="simple-tool-name">read_file</div>
+                            <div class="simple-tool-desc">Analyzed src/utils/dataProcessor.ts (lines 45-120)</div>
+                        </div>
+                        <div class="simple-tool-item">
+                            <div class="simple-tool-name">get_errors</div>
+                            <div class="simple-tool-desc">Checked for compilation errors - none found</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- APPROACH 4: Inline ChatGPT style -->
+        <div class="demo-section">
+            <h2 class="section-title">Approach 4: Inline Text (ChatGPT Style)</h2>
+            <p class="section-desc">Integrated into message content, conversational feel.</p>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I'll help you refactor the authentication module. Let me analyze the codebase first.</p>
+                    </div>
+
+                    <div class="tool-inline">
+                        <div class="tool-inline-item">
+                            <span class="tool-inline-bullet">→</span>
+                            <span>Used <strong>grep_search</strong> to find auth patterns across 247 files</span>
+                        </div>
+                        <div class="tool-inline-item">
+                            <span class="tool-inline-bullet">→</span>
+                            <span>Read <strong>src/auth/index.ts</strong> and <strong>src/auth/middleware.ts</strong></span>
+                        </div>
+                        <div class="tool-inline-item">
+                            <span class="tool-inline-bullet">→</span>
+                            <span>Ran <strong>get_errors</strong> to check for existing issues</span>
+                        </div>
+                    </div>
+
+                    <div class="message-text" style="margin-top: 12px;">
+                        <p>Based on my analysis, here are the recommended changes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="demo-section">
+            <h2 class="section-title">Which Approach to Use?</h2>
+            <div class="tool-list-simple">
+                <div class="simple-tool-item" style="border-left-color: rgba(34, 197, 94, 0.5);">
+                    <div class="simple-tool-name">✅ Emoji-Based (Recommended)</div>
+                    <div class="simple-tool-desc">Most flexible. Backend controls the icon. Works with any tool. Universal and fun.</div>
+                </div>
+                <div class="simple-tool-item" style="border-left-color: rgba(59, 130, 246, 0.5);">
+                    <div class="simple-tool-name">Generic Icon + Name</div>
+                    <div class="simple-tool-desc">Professional. Consistent. Tool name is self-explanatory. Simple to implement.</div>
+                </div>
+                <div class="simple-tool-item" style="border-left-color: rgba(168, 85, 247, 0.5);">
+                    <div class="simple-tool-name">Minimalist Text-Only</div>
+                    <div class="simple-tool-desc">Most enterprise-friendly. Clean. Accessible. No visual noise.</div>
+                </div>
+                <div class="simple-tool-item" style="border-left-color: rgba(251, 146, 60, 0.5);">
+                    <div class="simple-tool-name">Inline ChatGPT Style</div>
+                    <div class="simple-tool-desc">Conversational. Less intrusive. Good for simple tool lists.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

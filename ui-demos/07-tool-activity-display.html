@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Tool Activity Display - Agent Actions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 48px 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 32px;
+            letter-spacing: -0.5px;
+        }
+
+        /* Chat Message Structure */
+        .message {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 12px;
+        }
+
+        /* Tool Activity Section */
+        .tool-activity-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            color: #60a5fa;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+
+        .tool-activity-toggle:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            background: rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Tool Activity Panel - Collapsed View (Always Visible) */
+        .tool-activity-compact {
+            margin-top: 12px;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-activity-compact:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .compact-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .compact-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .compact-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .action-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .action-pill.search {
+            color: #60a5fa;
+        }
+
+        .action-pill.read {
+            color: #34d399;
+        }
+
+        .action-pill.write {
+            color: #fb923c;
+        }
+
+        .action-pill.execute {
+            color: #a78bfa;
+        }
+
+        /* Tool Activity Panel - Expanded View */
+        .tool-activity-expanded {
+            margin-top: 12px;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            animation: expandPanel 0.3s ease;
+        }
+
+        @keyframes expandPanel {
+            from {
+                opacity: 0;
+                transform: scaleY(0.95);
+                transform-origin: top;
+            }
+            to {
+                opacity: 1;
+                transform: scaleY(1);
+            }
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Tool Activity Items */
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            animation: toolItemIn 0.3s ease;
+        }
+
+        @keyframes toolItemIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .tool-icon.search {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .tool-icon.read {
+            background: rgba(52, 211, 153, 0.15);
+            color: #34d399;
+        }
+
+        .tool-icon.write {
+            background: rgba(251, 146, 60, 0.15);
+            color: #fb923c;
+        }
+
+        .tool-icon.execute {
+            background: rgba(167, 139, 250, 0.15);
+            color: #a78bfa;
+        }
+
+        .tool-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-description {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .tool-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+        }
+
+        .tool-time {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tool-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Real-time Tool Execution (Streaming) */
+        .tool-streaming {
+            margin-top: 12px;
+            padding: 16px;
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 12px;
+        }
+
+        .streaming-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .streaming-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #60a5fa;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .streaming-text {
+            font-size: 13px;
+            font-weight: 500;
+            color: #60a5fa;
+        }
+
+        .streaming-log {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        /* Timeline View for Multiple Tools */
+        .tool-timeline {
+            position: relative;
+            padding-left: 24px;
+        }
+
+        .tool-timeline::before {
+            content: '';
+            position: absolute;
+            left: 16px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(59, 130, 246, 0.3) 0%, rgba(167, 139, 250, 0.3) 100%);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 12px 0;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -18px;
+            top: 18px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #60a5fa;
+            border: 2px solid #1e1e1e;
+        }
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .demo-section {
+            margin-bottom: 48px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tool Activity Visualization</h1>
+
+        <!-- Example 1: Compact View (Default) -->
+        <div class="demo-section">
+            <h2 class="section-title">Compact View (Inline)</h2>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've searched through your codebase and found the authentication module. I've analyzed the structure and identified 3 areas that could be improved for better security.</p>
+                    </div>
+
+                    <!-- Compact Tool Summary -->
+                    <div class="tool-activity-compact" onclick="toggleExpanded('expanded1')">
+                        <div class="compact-header">
+                            <span class="compact-title">🤖 Agent Actions</span>
+                            <span class="tool-badge">4</span>
+                        </div>
+                        <div class="compact-actions">
+                            <div class="action-pill search">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <path d="m21 21-4.35-4.35"/>
+                                </svg>
+                                Search
+                            </div>
+                            <div class="action-pill read">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                </svg>
+                                Read (2)
+                            </div>
+                            <div class="action-pill execute">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m5 3 14 9-14 9V3z"/>
+                                </svg>
+                                Execute
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 2: Expanded View -->
+        <div class="demo-section">
+            <h2 class="section-title">Expanded View (Detailed)</h2>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've refactored the authentication module with improved error handling and added TypeScript types for better type safety.</p>
+                    </div>
+
+                    <!-- Expanded Tool Activity Panel -->
+                    <div class="tool-activity-expanded">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"/>
+                                    <rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="14" y="14" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                                Agent Activity Log
+                            </div>
+                            <button class="close-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 6L6 18M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="tool-items">
+                            <!-- Search Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon search">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="11" cy="11" r="8"/>
+                                        <path d="m21 21-4.35-4.35"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Searched codebase for authentication patterns
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:34 PM
+                                        </span>
+                                        <span>•</span>
+                                        <span>14 files matched</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Read Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon read">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <path d="M14 2v6h6"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Read authentication module source code
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-file">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                                            </svg>
+                                            src/auth/index.ts
+                                        </span>
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:34 PM
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Write Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon write">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Updated auth module with improved error handling
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-file">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                                            </svg>
+                                            src/auth/index.ts
+                                        </span>
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:35 PM
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Execute Tool -->
+                            <div class="tool-item">
+                                <div class="tool-icon execute">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M4 4l5 16 3.5-7L20 9.5z"/>
+                                    </svg>
+                                </div>
+                                <div class="tool-details">
+                                    <div class="tool-description">
+                                        Ran TypeScript type checker on modified files
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">
+                                            <span class="tool-status"></span>
+                                            2:35 PM
+                                        </span>
+                                        <span>•</span>
+                                        <span style="color: #34d399;">✓ No errors</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 3: Real-time Streaming -->
+        <div class="demo-section">
+            <h2 class="section-title">Real-time Streaming (Active)</h2>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I'm analyzing your project structure and running diagnostics...</p>
+                    </div>
+
+                    <!-- Streaming Tool Activity -->
+                    <div class="tool-streaming">
+                        <div class="streaming-header">
+                            <div class="streaming-spinner"></div>
+                            <span class="streaming-text">Running diagnostics...</span>
+                        </div>
+                        <div class="streaming-log">
+                            $ npm run type-check<br>
+                            ✓ Checking types in src/...<br>
+                            ✓ Found 0 errors in 24 files<br>
+                            <span style="color: rgba(255,255,255,0.5);">$ Running linter...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 4: Timeline View -->
+        <div class="demo-section">
+            <h2 class="section-title">Timeline View (Sequential)</h2>
+            
+            <div class="message">
+                <div class="avatar">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've completed a full refactoring of the authentication system. Here's what I did:</p>
+                    </div>
+
+                    <div class="tool-activity-expanded">
+                        <div class="panel-header">
+                            <div class="panel-title">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <path d="M12 6v6l4 2"/>
+                                </svg>
+                                Execution Timeline
+                            </div>
+                        </div>
+
+                        <div class="tool-items">
+                            <div class="tool-timeline">
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="tool-item" style="padding: 0;">
+                                        <div class="tool-icon search">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="11" cy="11" r="8"/>
+                                                <path d="m21 21-4.35-4.35"/>
+                                            </svg>
+                                        </div>
+                                        <div class="tool-details">
+                                            <div class="tool-description">Searched for auth patterns</div>
+                                            <div class="tool-meta">
+                                                <span class="tool-time">2:34:12 PM</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="tool-item" style="padding: 0;">
+                                        <div class="tool-icon read">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="tool-details">
+                                            <div class="tool-description">Read auth module files</div>
+                                            <div class="tool-meta">
+                                                <span class="tool-time">2:34:15 PM</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="tool-item" style="padding: 0;">
+                                        <div class="tool-icon write">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="tool-details">
+                                            <div class="tool-description">Refactored authentication logic</div>
+                                            <div class="tool-meta">
+                                                <span class="tool-time">2:34:45 PM</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="timeline-item">
+                                    <div class="timeline-dot"></div>
+                                    <div class="tool-item" style="padding: 0;">
+                                        <div class="tool-icon execute">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M4 4l5 16 3.5-7L20 9.5z"/>
+                                            </svg>
+                                        </div>
+                                        <div class="tool-details">
+                                            <div class="tool-description">Validated changes with type checker</div>
+                                            <div class="tool-meta">
+                                                <span class="tool-time">2:35:02 PM</span>
+                                                <span>•</span>
+                                                <span style="color: #34d399;">✓ Success</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleExpanded(id) {
+            // Demo toggle functionality
+            const panel = document.getElementById(id);
+            if (panel) {
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+    </script>
+</body>
+</html>

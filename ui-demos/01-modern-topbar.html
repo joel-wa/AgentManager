@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Top Bar - Tesla/ChatGPT Inspired</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar Styling - Minimal, Premium, Tesla-inspired */
+        .topbar {
+            height: 56px;
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        /* Logo Section */
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-name {
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: -0.3px;
+            color: #fff;
+        }
+
+        /* Center Section - Project Selector */
+        .center-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .project-selector {
+            position: relative;
+        }
+
+        .project-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: -0.2px;
+        }
+
+        .project-button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-1px);
+        }
+
+        .project-button:active {
+            transform: translateY(0);
+        }
+
+        .new-project-button {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            color: #3b82f6;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .new-project-button:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* Right Section - Status & Actions */
+        .right-section {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(34, 197, 94, 0.08);
+            border: 1px solid rgba(34, 197, 94, 0.15);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #22c55e;
+        }
+
+        .health-dot {
+            width: 6px;
+            height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.95); }
+        }
+
+        .notification-button {
+            position: relative;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .notification-button:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border: 2px solid #1e1e1e;
+            border-radius: 50%;
+        }
+
+        .settings-button {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .settings-button:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+            transform: rotate(45deg);
+        }
+
+        /* Demo content area */
+        .demo-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+        }
+
+        .demo-info {
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .demo-info h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+
+        .demo-info p {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .demo-info .highlight {
+            color: #3b82f6;
+            font-weight: 500;
+        }
+
+        /* Icons (using SVG) */
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Modern Top Bar -->
+    <nav class="topbar">
+        <!-- Left: Logo & Brand -->
+        <div class="logo-section">
+            <div class="logo">A</div>
+            <span class="brand-name">Agent Manager</span>
+        </div>
+
+        <!-- Center: Project Selector -->
+        <div class="center-section">
+            <div class="project-selector">
+                <button class="project-button">
+                    <span>Enterprise Dashboard</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                </button>
+            </div>
+            <button class="new-project-button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Right: Status & Actions -->
+        <div class="right-section">
+            <div class="health-indicator">
+                <div class="health-dot"></div>
+                <span>All Systems Operational</span>
+            </div>
+            
+            <button class="notification-button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <div class="notification-badge"></div>
+            </button>
+
+            <button class="settings-button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6M1 12h6m6 0h6"/>
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Demo Content -->
+    <div class="demo-content">
+        <div class="demo-info">
+            <h1>Modern Top Bar Design</h1>
+            <p>Inspired by <span class="highlight">Tesla's minimalist approach</span> and <span class="highlight">ChatGPT's clean interface</span>.</p>
+            <p><strong>Key Improvements:</strong></p>
+            <p>• Glassmorphism with backdrop blur for premium feel</p>
+            <p>• Reduced visual clutter - only essential elements</p>
+            <p>• Smooth micro-interactions and hover states</p>
+            <p>• Professional status indicators</p>
+            <p>• Enterprise-grade visual hierarchy</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Tool Activity - JSON Args Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 48px 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 32px;
+            letter-spacing: -0.5px;
+        }
+
+        /* Message */
+        .message {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 12px;
+        }
+
+        /* Tool Activity Toggle */
+        .tool-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            color: #60a5fa;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-toggle:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            background: rgba(59, 130, 246, 0.25);
+            border-radius: 11px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Tool Activity Panel */
+        .tool-panel {
+            margin-top: 12px;
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Tool Items */
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Tool Header (collapsed view) */
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            cursor: pointer;
+        }
+
+        .tool-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            flex-shrink: 0;
+            font-size: 18px;
+        }
+
+        .tool-summary {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #60a5fa;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            margin-bottom: 3px;
+        }
+
+        .tool-brief {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .tool-time {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        .expand-icon {
+            width: 20px;
+            height: 20px;
+            color: rgba(255, 255, 255, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .tool-item.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Tool Details (expanded view) */
+        .tool-details {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(0, 0, 0, 0.3);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .tool-item.expanded .tool-details {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .tool-details::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tool-details::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .tool-details::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .details-section {
+            padding: 12px;
+        }
+
+        .details-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        /* Key-Value Args Display */
+        .args-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .arg-item {
+            display: flex;
+            gap: 12px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        .arg-key {
+            color: #a78bfa;
+            font-weight: 600;
+            min-width: 80px;
+            flex-shrink: 0;
+        }
+
+        .arg-value {
+            color: #fbbf24;
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .arg-value.long {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            line-height: 1.5;
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        /* Raw JSON View */
+        .json-view {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #a5d6ff;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .json-key {
+            color: #a78bfa;
+        }
+
+        .json-string {
+            color: #fbbf24;
+        }
+
+        .json-number {
+            color: #34d399;
+        }
+
+        /* Copy Button */
+        .copy-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+
+        .copy-button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Real Tool Activity Display</h1>
+
+        <div class="message">
+            <div class="avatar">AI</div>
+            <div class="message-content">
+                <div class="message-text">
+                    <p>I've created the anime apocalypse bedroom concept document and updated your recent activity log. The concept is fully developed and ready for detailed planning!</p>
+                </div>
+
+                <!-- Tool Activity Toggle -->
+                <button class="tool-toggle" onclick="togglePanel()">
+                    <span>🤖 Tool Activity</span>
+                    <span class="tool-badge">2</span>
+                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                </button>
+
+                <!-- Tool Activity Panel -->
+                <div class="tool-panel" id="toolPanel" style="display: none;">
+                    <div class="panel-header">
+                        <div class="panel-title">Tool Execution Log</div>
+                    </div>
+
+                    <div class="tool-items">
+                        <!-- Tool 1: write_file -->
+                        <div class="tool-item" id="tool1">
+                            <div class="tool-header" onclick="toggleTool('tool1')">
+                                <div class="tool-icon">📝</div>
+                                <div class="tool-summary">
+                                    <div class="tool-name">write_file</div>
+                                    <div class="tool-brief">video-concepts/anime-apocalypse-bedroom.md</div>
+                                </div>
+                                <div class="tool-meta">
+                                    <span class="tool-time">06:22</span>
+                                    <span>•</span>
+                                    <span>3.2 KB</span>
+                                </div>
+                                <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+
+                            <div class="tool-details">
+                                <div class="details-section">
+                                    <div class="details-label">Arguments</div>
+                                    <div class="args-grid">
+                                        <div class="arg-item">
+                                            <div class="arg-key">path</div>
+                                            <div class="arg-value">video-concepts/anime-apocalypse-bedroom.md</div>
+                                        </div>
+                                        <div class="arg-item">
+                                            <div class="arg-key">content</div>
+                                            <div class="arg-value long"># I Survived Anime Apocalypse in My Bedroom - Full Concept
+
+## Core Concept
+Transform normal bedroom into anime apocalypse scenario using AI video editing while maintaining real reactions and challenges.
+
+## Why This Works (Manhwa/Apocalypse Survival Appeal)
+- **Progression systems** (leveling up, finding supplies)
+- **Choice consequences** (bad decisions = disaster)
+- **World-building details** (how the apocalypse works)
+- **Personal stakes** (survival, protecting something/someone)
+- **Immersive "what would I do?" factor**
+- **Binge-watchable content structure**
+
+## Unique Selling Points
+1. **Real room + AI transformation** = impossible scenarios with genuine reactions
+2. **Relatable setting** (bedroom) + epic scale (apocalypse)
+3. **Manhwa storytelling** + YouTube challenge format
+4. **Interactive elements** (audience participation in survival choices)
+
+[... content continues ...]</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="details-section" style="border-top: 1px solid rgba(255, 255, 255, 0.06);">
+                                    <div class="details-label">Raw JSON</div>
+                                    <div class="json-view">{"path":"video-concepts/anime-apocalypse-bedroom.md","content":"# I Survived Anime Apocalypse in My Bedroom - Full Concept\n\n## Core Concept\nTransform normal bedroom into anime apocalypse..."}</div>
+                                    <button class="copy-button">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                        </svg>
+                                        Copy JSON
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tool 2: write_file (Recents) -->
+                        <div class="tool-item" id="tool2">
+                            <div class="tool-header" onclick="toggleTool('tool2')">
+                                <div class="tool-icon">📝</div>
+                                <div class="tool-summary">
+                                    <div class="tool-name">write_file</div>
+                                    <div class="tool-brief">Recents.md • Major Breakthrough</div>
+                                </div>
+                                <div class="tool-meta">
+                                    <span class="tool-time">06:22</span>
+                                    <span>•</span>
+                                    <span>1.1 KB</span>
+                                </div>
+                                <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+
+                            <div class="tool-details">
+                                <div class="details-section">
+                                    <div class="details-label">Arguments</div>
+                                    <div class="args-grid">
+                                        <div class="arg-item">
+                                            <div class="arg-key">path</div>
+                                            <div class="arg-value">Recents.md</div>
+                                        </div>
+                                        <div class="arg-item">
+                                            <div class="arg-key">content</div>
+                                            <div class="arg-value long"># Recent Activity
+
+## 2024-01-XX - Anime Apocalypse Bedroom Concept Development
+
+### Major Breakthrough
+- Identified "I Survived Anime Apocalypse in My Bedroom" as core concept
+- Analyzed manhwa/apocalypse survival content appeal
+- Mapped out AI + real room production approach
+
+### Key Insights
+- Manhwa audience craves progression systems and choice consequences
+- Real reactions + AI transformations = unique selling point
+- Interactive elements crucial for engagement
+
+[... content continues ...]</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="details-section" style="border-top: 1px solid rgba(255, 255, 255, 0.06);">
+                                    <div class="details-label">Raw JSON</div>
+                                    <div class="json-view">{"path":"Recents.md","content":"# Recent Activity\n\n## 2024-01-XX - Anime Apocalypse Bedroom Concept Development\n\n### Major Breakthrough..."}</div>
+                                    <button class="copy-button">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2"/>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                        </svg>
+                                        Copy JSON
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePanel() {
+            const panel = document.getElementById('toolPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleTool(id) {
+            const tool = document.getElementById(id);
+            tool.classList.toggle('expanded');
+        }
+
+        // Copy to clipboard
+        document.querySelectorAll('.copy-button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const jsonView = btn.previousElementSibling;
+                navigator.clipboard.writeText(jsonView.textContent);
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy JSON';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>

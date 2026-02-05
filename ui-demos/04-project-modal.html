@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Project Modal - Tesla Inspired</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            animation: fadeIn 0.2s ease;
+            z-index: 1000;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Modal Container */
+        .modal {
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 540px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Modal Header */
+        .modal-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.4px;
+        }
+
+        .close-button {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .close-button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        /* Modal Body */
+        .modal-body {
+            padding: 28px;
+        }
+
+        /* Form Group */
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 8px;
+            letter-spacing: -0.1px;
+        }
+
+        .required {
+            color: #ef4444;
+        }
+
+        /* Input Fields */
+        input, textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input:focus, textarea:focus {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: inherit;
+        }
+
+        /* Character Counter */
+        .char-counter {
+            text-align: right;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 6px;
+        }
+
+        /* Template Selection */
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .template-card {
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+
+        .template-card:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .template-card.selected {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .template-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            color: #60a5fa;
+        }
+
+        .template-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .template-desc {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            line-height: 1.4;
+        }
+
+        /* Modal Footer */
+        .modal-footer {
+            padding: 20px 28px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: -0.1px;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        svg {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="modal-overlay">
+        <div class="modal">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Project</h2>
+                <button class="close-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <!-- Project Name -->
+                <div class="form-group">
+                    <label>
+                        Project Name <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g., Enterprise Dashboard" 
+                        id="projectName"
+                        maxlength="60"
+                    />
+                </div>
+
+                <!-- Project Description -->
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea 
+                        placeholder="Brief description of your project..."
+                        id="projectDescription"
+                        maxlength="200"
+                    ></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span> / 200
+                    </div>
+                </div>
+
+                <!-- Template Selection -->
+                <div class="form-group">
+                    <label>Project Template</label>
+                    <div class="template-grid">
+                        <div class="template-card selected">
+                            <div class="template-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="7" height="7"/>
+                                    <rect x="14" y="3" width="7" height="7"/>
+                                    <rect x="14" y="14" width="7" height="7"/>
+                                    <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                            </div>
+                            <div class="template-name">Blank</div>
+                            <div class="template-desc">Start from scratch</div>
+                        </div>
+
+                        <div class="template-card">
+                            <div class="template-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <path d="M14 2v6h6"/>
+                                </svg>
+                            </div>
+                            <div class="template-name">Documentation</div>
+                            <div class="template-desc">Notes & docs</div>
+                        </div>
+
+                        <div class="template-card">
+                            <div class="template-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </div>
+                            <div class="template-name">Knowledge Base</div>
+                            <div class="template-desc">Organized content</div>
+                        </div>
+
+                        <div class="template-card">
+                            <div class="template-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="m18 16 4-4-4-4M6 8l-4 4 4 4"/>
+                                </svg>
+                            </div>
+                            <div class="template-name">Code Project</div>
+                            <div class="template-desc">Dev workspace</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button class="btn-secondary">Cancel</button>
+                <button class="btn-primary" id="createButton" disabled>Create Project</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Template selection
+        document.querySelectorAll('.template-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Character counter
+        const textarea = document.getElementById('projectDescription');
+        const charCount = document.getElementById('charCount');
+        
+        textarea.addEventListener('input', function() {
+            charCount.textContent = this.value.length;
+        });
+
+        // Enable/disable create button based on project name
+        const projectName = document.getElementById('projectName');
+        const createButton = document.getElementById('createButton');
+
+        projectName.addEventListener('input', function() {
+            createButton.disabled = this.value.trim().length === 0;
+        });
+
+        // Close button
+        document.querySelector('.close-button').addEventListener('click', function() {
+            document.querySelector('.modal-overlay').style.animation = 'fadeOut 0.2s ease';
+            setTimeout(() => {
+                alert('Modal would close here');
+            }, 200);
+        });
+
+        // Create button
+        createButton.addEventListener('click', function() {
+            if (projectName.value.trim()) {
+                alert(`Project "${projectName.value}" would be created!`);
+            }
+        });
+
+        // Close on overlay click
+        document.querySelector('.modal-overlay').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.animation = 'fadeOut 0.2s ease';
+                setTimeout(() => {
+                    alert('Modal would close here');
+                }, 200);
+            }
+        });
+    </script>
+</body>
+</html>
