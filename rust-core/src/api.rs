@@ -611,7 +611,7 @@ pub async fn list_file_versions(
 /// Get a specific version of a file
 pub async fn get_file_version(
     State(state): State<Arc<RwLock<AppState>>>,
-    Path((id, path, version)): Path<(String, String, u32)>,
+    Path((id, version, path)): Path<(String, u32, String)>,
 ) -> Result<Json<VersionEntry>, StatusCode> {
     let state = state.read().await;
     match state.workspace.get_version(&id, &path, version) {
@@ -626,7 +626,7 @@ pub async fn get_file_version(
 /// Restore a file to a specific version
 pub async fn restore_file_version(
     State(state): State<Arc<RwLock<AppState>>>,
-    Path((id, path, version)): Path<(String, String, u32)>,
+    Path((id, version, path)): Path<(String, u32, String)>,
 ) -> Result<StatusCode, StatusCode> {
     let state = state.read().await;
     match state.workspace.restore_version(&id, &path, version) {

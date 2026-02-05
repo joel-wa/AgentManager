@@ -39,6 +39,7 @@ The system consists of three main components:
 
 - **Chat-First Interface**: Clean, minimal chat with your local AI agent
 - **Persistent Memory**: Files and notes are stored in organized workspaces
+- **File Version Tracking**: Automatic version control for all file changes with restore capability
 - **Tool Usage Transparency**: See exactly what the agent is doing
 - **Background Maintenance**: Cloud AI keeps your workspace organized
 - **Timeline View**: Track your session history and file changes
@@ -191,6 +192,61 @@ cargo clippy   # Lint code
 cd python-services/main_agent
 python main.py                    # Run service
 python -m pytest                  # Run tests
+```
+
+## File Version Tracking
+
+AgentManager automatically tracks all file changes made by the agent, similar to Git or Mercurial. Every time a file is modified, the previous version is saved, allowing you to review and restore previous states.
+
+### How It Works
+
+- **Automatic Versioning**: When the agent modifies a file, the previous content is automatically saved as a version
+- **Version Storage**: Versions are stored in `.meta/versions/` within each project directory
+- **Content Hashing**: Each version includes a SHA256 hash for integrity verification
+- **Metadata**: Timestamps, file size, and optional messages are tracked for each version
+
+### API Endpoints
+
+#### List All Versions of a File
+```bash
+GET /api/projects/:id/versions/:path
+```
+
+Returns version history including metadata for all versions.
+
+#### Get a Specific Version
+```bash
+GET /api/projects/:id/version/:version/:path
+```
+
+Retrieves the content and metadata for a specific version number.
+
+#### Restore a File to a Previous Version
+```bash
+POST /api/projects/:id/restore/:version/:path
+```
+
+Restores the file to a previous version. The current content is saved as a new version before restoration.
+
+### Example Usage
+
+```bash
+# List versions of a file
+curl http://localhost:8000/api/projects/PROJECT_ID/versions/myfile.txt
+
+# Get version 2
+curl http://localhost:8000/api/projects/PROJECT_ID/version/2/myfile.txt
+
+# Restore to version 1
+curl -X POST http://localhost:8000/api/projects/PROJECT_ID/restore/1/myfile.txt
+```
+
+### Testing
+
+Run the included test suite to verify version tracking:
+
+```bash
+python test_version_tracking.py
 ```
 
 ## License

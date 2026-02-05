@@ -59,7 +59,7 @@ def test_list_versions(project_id, path):
     """List all versions of a file"""
     print(f"\nListing versions for: {path}")
     
-    response = requests.get(f"{BASE_URL}/projects/{project_id}/files/{path}/versions")
+    response = requests.get(f"{BASE_URL}/projects/{project_id}/versions/{path}")
     
     if response.status_code == 200:
         history = response.json()
@@ -86,7 +86,7 @@ def test_get_version(project_id, path, version):
     """Get a specific version of a file"""
     print(f"\nGetting version {version} of: {path}")
     
-    response = requests.get(f"{BASE_URL}/projects/{project_id}/files/{path}/versions/{version}")
+    response = requests.get(f"{BASE_URL}/projects/{project_id}/version/{version}/{path}")
     
     if response.status_code == 200:
         version_entry = response.json()
@@ -103,7 +103,7 @@ def test_restore_version(project_id, path, version):
     print(f"\nRestoring {path} to version {version}")
     
     response = requests.post(
-        f"{BASE_URL}/projects/{project_id}/files/{path}/versions/{version}/restore"
+        f"{BASE_URL}/projects/{project_id}/restore/{version}/{path}"
     )
     
     if response.status_code == 200:
