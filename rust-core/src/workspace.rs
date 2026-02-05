@@ -424,9 +424,41 @@ This file tracks decisions, discussions, and important changes.
             let oid = oid?;
             let commit = repo.find_commit(oid)?;
             
-            // Check if this commit touches the file
+            // Check if this commit actually modified the file (not just contains it)
             let tree = commit.tree()?;
-            if let Ok(_entry) = tree.get_path(std::path::Path::new(file_path)) {
+            let file_exists = tree.get_path(std::path::Path::new(file_path)).is_ok();
+            
+            if !file_exists {
+                continue; // File doesn't exist in this commit
+            }
+            
+            // Check if file was modified in this commit by comparing with parent
+            let file_changed = if commit.parent_count() == 0 {
+                // First commit - file was created here
+                true
+            } else {
+                // Compare with parent commit
+                let parent = commit.parent(0)?;
+                let parent_tree = parent.tree()?;
+                
+                // Get file blob in current commit
+                let entry = tree.get_path(std::path::Path::new(file_path))?;
+                let current_oid = entry.id();
+                
+                // Check if file existed in parent and if content changed
+                match parent_tree.get_path(std::path::Path::new(file_path)) {
+                    Ok(parent_entry) => {
+                        // File existed in parent - check if content changed
+                        current_oid != parent_entry.id()
+                    }
+                    Err(_) => {
+                        // File didn't exist in parent - it was created in this commit
+                        true
+                    }
+                }
+            };
+            
+            if file_changed {
                 version_num += 1;
                 
                 let timestamp = chrono::DateTime::from_timestamp(commit.time().seconds(), 0)

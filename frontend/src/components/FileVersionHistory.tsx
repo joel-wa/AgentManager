@@ -28,6 +28,11 @@ export function FileVersionHistory({ projectId, filePath, fileName, onRestore, o
     setLoading(true)
     setError(null)
     try {
+      console.log('[FileVersionHistory] Fetching version history for:', {
+        projectId,
+        filePath,
+        url: `http://localhost:8000/api/projects/${projectId}/versions/${encodeURIComponent(filePath)}`
+      })
       const data = await api.listFileVersions(projectId, filePath)
       console.log('[FileVersionHistory] Loaded version history:', {
         filePath,
@@ -37,6 +42,7 @@ export function FileVersionHistory({ projectId, filePath, fileName, onRestore, o
       })
       setHistory(data)
     } catch (err) {
+      console.error('[FileVersionHistory] Error loading version history:', err)
       setError(err instanceof Error ? err.message : 'Failed to load version history')
     } finally {
       setLoading(false)

@@ -15,9 +15,48 @@ import json
 import os
 import asyncio
 import httpx
+import subprocess
 
 from ollama_client import OllamaClient
 from tool_logic import ToolExecutor
+
+# Auto-commit function for version tracking
+async def auto_commit_project(project_id: str, workspace_root: str) -> None:
+    """Auto-commit any pending changes before processing chat"""
+    try:
+        project_dir = os.path.join(workspace_root, "projects", project_id)
+        if not os.path.exists(project_dir):
+            return
+        
+        # Check if there are any changes to commit
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            # There are changes - commit them
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=project_dir,
+                capture_output=True,
+                timeout=5
+            )
+            
+            commit_msg = f"Auto-commit before chat - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            subprocess.run(
+                ["git", "commit", "-m", commit_msg],
+                cwd=project_dir,
+                capture_output=True,
+                timeout=5
+            )
+            print(f"[AUTO-COMMIT] Committed pending changes in project {project_id}")
+    except Exception as e:
+        # Don't fail the chat if commit fails
+        print(f"[AUTO-COMMIT] Warning: Failed to auto-commit: {e}")
 
 app = FastAPI(
     title="Main Agent Service",
@@ -93,6 +132,10 @@ async def chat(request: ChatRequest):
     Implements agentic loop: agent can see tool results and make follow-up decisions
     """
     try:
+        # Auto-commit any pending changes BEFORE starting chat
+        if request.project_id and request.workspace_root:
+            await auto_commit_project(request.project_id, request.workspace_root)
+        
         # Compute the project working directory
         project_working_dir = None
         if request.workspace_root and request.project_id:
@@ -309,6 +352,10 @@ async def chat_stream(request: ChatRequest):
     Streaming version of chat endpoint that sends updates as they happen
     Streams tool calls and responses in real-time using Server-Sent Events
     """
+    # Auto-commit any pending changes BEFORE starting chat
+    if request.project_id and request.workspace_root:
+        await auto_commit_project(request.project_id, request.workspace_root)
+    
     async def event_generator():
         try:
             # Compute the project working directory
