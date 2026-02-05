@@ -88,6 +88,25 @@ export interface HealthStatus {
   };
 }
 
+export interface VersionMetadata {
+  version: number;
+  timestamp: string;
+  file_size: number;
+  content_hash: string;
+  message?: string;
+}
+
+export interface VersionEntry {
+  metadata: VersionMetadata;
+  content: string;
+}
+
+export interface VersionHistory {
+  file_path: string;
+  current_version: number;
+  versions: VersionMetadata[];
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -158,6 +177,26 @@ class ApiService {
       body: content,
     });
     if (!res.ok) throw new Error('Failed to write file');
+  }
+
+  // Version Tracking Operations
+  async listFileVersions(projectId: string, filePath: string): Promise<VersionHistory> {
+    const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/versions/${encodeURIComponent(filePath)}`);
+    if (!res.ok) throw new Error('Failed to fetch version history');
+    return res.json();
+  }
+
+  async getFileVersion(projectId: string, filePath: string, version: number): Promise<VersionEntry> {
+    const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/version/${version}/${encodeURIComponent(filePath)}`);
+    if (!res.ok) throw new Error('Failed to fetch version content');
+    return res.json();
+  }
+
+  async restoreFileVersion(projectId: string, filePath: string, version: number): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/api/projects/${projectId}/restore/${version}/${encodeURIComponent(filePath)}`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error('Failed to restore version');
   }
 
   // Chat - Rust core proxies to Python agent service

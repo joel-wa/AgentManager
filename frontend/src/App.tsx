@@ -31,6 +31,7 @@ export type Message = {
   content: string
   timestamp: Date
   toolActivity?: ToolActivity[]
+  fileChanges?: FileChange[]
 }
 
 export type ToolActivity = {
@@ -38,6 +39,12 @@ export type ToolActivity = {
   description: string
   filePath?: string
   timestamp: Date
+}
+
+export type FileChange = {
+  path: string
+  action: 'modified' | 'created' | 'deleted'
+  previousVersion?: number
 }
 
 export type TimelineEntry = {
@@ -473,6 +480,17 @@ function App() {
         },
         // onComplete - final response received
         (response) => {
+          // Extract file changes from tool activity
+          const fileChanges = (response.tool_calls || [])
+            .filter(tc => tc.name === 'write_file' || tc.name === 'WriteFileTool')
+            .map(tc => {
+              const args = tc.arguments as any
+              return {
+                path: args.file_path || args.path || 'unknown',
+                action: 'modified' as const
+              }
+            })
+
           const finalMessage: Message = {
             id: response.message_id,
             role: 'assistant',
@@ -482,13 +500,25 @@ function App() {
               type: tc.name as 'search' | 'read' | 'write' | 'execute',
               description: `${tc.name}: ${JSON.stringify(tc.arguments)}`,
               timestamp: new Date()
-            }))
+            })),
+            fileChanges: fileChanges.length > 0 ? fileChanges : undefined
           }
           
           // Replace placeholder with final message
           setMessages(prev => prev.map(m => 
             m.id === assistantMessageId ? finalMessage : m
           ))
+          
+          // Add to timeline if there are file changes
+          if (fileChanges.length > 0) {
+            const newEntry: TimelineEntry = {
+              id: `timeline-${Date.now()}`,
+              timestamp: new Date(),
+              title: `AI Response: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+              files: fileChanges.map(fc => ({ action: fc.action, path: fc.path }))
+            }
+            setTimeline(prev => [newEntry, ...prev])
+          }
           
           // Check if we should trigger a summary (every 10 messages)
           const totalMessages = messages.length + 2
@@ -670,6 +700,27 @@ function App() {
     }
   }
 
+  const handleVersionRestore = async (filePath: string, version: number) => {
+    if (!currentProject) return
+    
+    try {
+      await api.restoreFileVersion(currentProject.id, filePath, version)
+      
+      // Reload file list and timeline
+      await loadAvailableFiles()
+      await loadTimeline()
+      
+      // If viewing this file, reload its content
+      if (viewingFile && viewingFile.path === filePath) {
+        const content = await api.getFileContent(currentProject.id, filePath)
+        setViewingFile({ ...viewingFile, content })
+      }
+    } catch (error) {
+      console.error('Failed to restore version:', error)
+      throw error
+    }
+  }
+
   const sidePanelTabs = [
     { id: 'files' as SidePanel, icon: FolderTree, label: 'Files' },
     { id: 'timeline' as SidePanel, icon: Clock, label: 'Timeline' },
@@ -701,6 +752,8 @@ function App() {
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
             availableFiles={availableFiles}
+            projectId={currentProject?.id}
+            onVersionRestore={handleVersionRestore}
           />
         </div>
         
@@ -751,7 +804,13 @@ function App() {
                   onFileSelect={handleFileSelect}
                 />
               )}
-              {sidePanel === 'timeline' && <Timeline entries={timeline} />}
+              {sidePanel === 'timeline' && (
+                <Timeline 
+                  entries={timeline} 
+                  projectId={currentProject?.id}
+                  onVersionRestore={handleVersionRestore}
+                />
+              )}
               {sidePanel === 'insights' && (
                 <Insights 
                   suggestions={suggestions}

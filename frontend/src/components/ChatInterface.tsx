@@ -4,15 +4,25 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import type { Message } from '../App'
+import { FileChangesList } from './FileChangesList'
 
 type Props = {
   messages: Message[]
   onSendMessage: (content: string, mentionedFiles?: string[]) => void
   isLoading?: boolean
   availableFiles?: string[]
+  projectId?: string
+  onVersionRestore?: (filePath: string, version: number) => void
 }
 
-export function ChatInterface({ messages, onSendMessage, isLoading = false, availableFiles = [] }: Props) {
+export function ChatInterface({ 
+  messages, 
+  onSendMessage, 
+  isLoading = false, 
+  availableFiles = [], 
+  projectId,
+  onVersionRestore 
+}: Props) {
   const [input, setInput] = useState('')
   const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
   const [showMentionDropdown, setShowMentionDropdown] = useState(false)
@@ -105,7 +115,12 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, avai
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-12 flex flex-col gap-8 min-h-0">
         {messages.map(message => (
-          <MessageBubble key={message.id} message={message} />
+          <MessageBubble 
+            key={message.id} 
+            message={message} 
+            projectId={projectId}
+            onVersionRestore={onVersionRestore}
+          />
         ))}
         
         {isLoading && (
@@ -215,7 +230,15 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, avai
   )
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ 
+  message, 
+  projectId, 
+  onVersionRestore 
+}: { 
+  message: Message
+  projectId?: string
+  onVersionRestore?: (filePath: string, version: number) => void
+}) {
   const [showToolActivity, setShowToolActivity] = useState(false)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
   const isUser = message.role === 'user'
@@ -378,6 +401,15 @@ function MessageBubble({ message }: { message: Message }) {
               </div>
             )}
           </>
+        )}
+        
+        {/* File Changes - Only for assistant messages */}
+        {!isUser && message.fileChanges && message.fileChanges.length > 0 && (
+          <FileChangesList
+            fileChanges={message.fileChanges}
+            projectId={projectId}
+            onVersionRestore={onVersionRestore}
+          />
         )}
       </div>
     </div>
