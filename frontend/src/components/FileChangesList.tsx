@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, History, Check, X, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { FileText, History, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import type { FileChange } from '../App'
 import { FileVersionHistory } from './FileVersionHistory'
 
