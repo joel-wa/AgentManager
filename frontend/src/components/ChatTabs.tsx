@@ -26,7 +26,7 @@ export function ChatTabs({ tabs, activeTabId, onTabChange, onTabClose, onNewTab 
   }
 
   return (
-    <div className="flex items-center gap-1 bg-dark-surface border-b border-dark-border px-2 py-1 overflow-x-auto">
+    <div className="flex items-center gap-1 bg-[#2a2a2a] border-b border-[rgba(255,255,255,0.06)] px-2 py-1 overflow-x-auto">
       {tabs.map(tab => (
         <button
           key={tab.id}
@@ -34,22 +34,22 @@ export function ChatTabs({ tabs, activeTabId, onTabChange, onTabClose, onNewTab 
           onMouseEnter={() => setHoveredTabId(tab.id)}
           onMouseLeave={() => setHoveredTabId(null)}
           className={`
-            group relative flex items-center gap-2 px-3 py-2 rounded-t-lg transition-colors min-w-[120px] max-w-[200px]
+            group relative flex items-center gap-2 px-3 py-2 rounded-t-lg transition-all min-w-[120px] max-w-[200px]
             ${activeTabId === tab.id 
-              ? 'bg-dark-bg text-white' 
-              : 'bg-dark-surface text-gray-400 hover:bg-dark-hover hover:text-white'
+              ? 'bg-[#1e1e1e] text-white border-t-2 border-blue-500' 
+              : 'bg-[#2a2a2a] text-white/60 hover:bg-white/4 hover:text-white'
             }
           `}
         >
           <div className="flex-1 truncate text-sm text-left">
             <div className="font-medium truncate">{tab.title}</div>
-            <div className="text-xs text-gray-500 truncate">{tab.projectName}</div>
+            <div className="text-xs text-white/40 truncate">{tab.projectName}</div>
           </div>
           
           {(hoveredTabId === tab.id || tabs.length > 1) && (
             <button
               onClick={(e) => handleTabClose(e, tab.id)}
-              className="flex-shrink-0 p-0.5 rounded hover:bg-gray-700 transition-colors"
+              className="flex-shrink-0 p-0.5 rounded hover:bg-white/10 transition-colors"
               title="Close tab"
             >
               <X className="w-3 h-3" />
@@ -60,7 +60,7 @@ export function ChatTabs({ tabs, activeTabId, onTabChange, onTabClose, onNewTab 
       
       <button
         onClick={onNewTab}
-        className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-dark-hover transition-colors"
+        className="flex items-center justify-center w-8 h-8 rounded-lg text-white/50 hover:text-white hover:bg-white/8 transition-all"
         title="New chat tab"
       >
         <Plus className="w-4 h-4" />

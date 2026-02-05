@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, ChevronDown, ChevronUp, Search, FileText, PenTool, Terminal, X } from 'lucide-react'
+import { Send, Paperclip, ChevronDown, FileText, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
-import type { Message, ToolActivity } from '../App'
+import type { Message } from '../App'
 
 type Props = {
   messages: Message[]
@@ -101,24 +101,19 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, avai
   }
 
   return (
-    <div className="flex-1 flex flex-col h-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 flex flex-col h-full max-w-[900px] mx-auto w-full px-6">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-12 flex flex-col gap-8 min-h-0">
         {messages.map(message => (
           <MessageBubble key={message.id} message={message} />
         ))}
         
         {isLoading && (
-          <div className="flex items-start gap-3 animate-fade-in">
-            <div className="w-8 h-8 rounded-full bg-accent-green flex items-center justify-center text-white text-sm font-medium">
-              AI
-            </div>
-            <div className="bg-dark-surface rounded-lg px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
-              </div>
+          <div className="flex items-start gap-4 animate-slide-in">
+            <div className="flex gap-1.5 pt-1">
+              <span className="w-2 h-2 bg-white/40 rounded-full animate-typing" />
+              <span className="w-2 h-2 bg-white/40 rounded-full animate-typing-delay-1" />
+              <span className="w-2 h-2 bg-white/40 rounded-full animate-typing-delay-2" />
             </div>
           </div>
         )}
@@ -126,86 +121,95 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, avai
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Input Area */}
-      <div className="border-t border-dark-border p-4">
-        {/* Mentioned Files */}
+      {/* Input Container */}
+      <div className="py-6 sticky bottom-0 bg-gradient-to-t from-[#1e1e1e] via-[#1e1e1e] to-transparent">
+        {/* Mentioned Files Pills */}
         {mentionedFiles.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
+          <div className="mb-3 flex flex-wrap gap-2">
             {mentionedFiles.map(file => (
               <div
                 key={file}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-accent-blue/20 text-accent-blue rounded text-sm"
-              >
-                <FileText className="w-3 h-3" />
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-[rgba(59,130,246,0.2)] 
+                  rounded-full text-sm text-blue-400 transition-all hover:bg-blue-500/15 hover:border-[rgba(59,130,246,0.3)]">
+
+                <FileText className="w-3.5 h-3.5" />
                 <span>{file}</span>
                 <button
                   onClick={() => removeMentionedFile(file)}
-                  className="hover:bg-accent-blue/30 rounded p-0.5"
+                  className="w-3.5 h-3.5 flex items-center justify-center hover:bg-blue-500/20 rounded-full transition-colors"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-2.5 h-2.5" />
                 </button>
               </div>
             ))}
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
-          <button
-            type="button"
-            className="p-2 text-gray-400 hover:text-white hover:bg-dark-hover rounded-lg transition-colors"
-            title="Attach file"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-          
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
-              className="w-full bg-dark-surface border border-dark-border rounded-lg px-4 py-3 pr-12 
-                text-white placeholder-gray-500 resize-none focus:outline-none focus:border-accent-blue
-                transition-colors"
-              rows={1}
-              disabled={isLoading}
-            />
+        {/* Input Wrapper */}
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-end gap-3 bg-[rgba(255,255,255,0.04)] border-[1.5px] border-[rgba(255,255,255,0.08)] rounded-2xl p-3 
+            transition-all duration-300 focus-within:bg-[rgba(255,255,255,0.06)] focus-within:border-[rgba(59,130,246,0.4)] focus-within:shadow-[0_0_0_4px_rgba(59,130,246,0.08)]">
+            <button
+              type="button"
+              className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white/90 
+                hover:bg-white/8 rounded-lg transition-all flex-shrink-0"
+              title="Attach file"
+            >
+              <Paperclip className="w-[18px] h-[18px]" />
+            </button>
             
-            {/* Mention Dropdown */}
-            {showMentionDropdown && filteredFiles.length > 0 && (
-              <div
-                ref={dropdownRef}
-                className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-dark-surface border border-dark-border rounded-lg shadow-xl z-50"
-              >
-                {filteredFiles.map(file => (
-                  <button
-                    key={file}
-                    type="button"
-                    onClick={() => handleMentionSelect(file)}
-                    className="w-full flex items-center gap-2 px-4 py-2 hover:bg-dark-hover text-left text-sm text-gray-200"
-                  >
-                    <FileText className="w-4 h-4 text-accent-blue" />
-                    <span>{file}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
+                className="w-full bg-transparent border-none text-white text-[15px] placeholder-white/40 
+                  resize-none outline-none leading-6 max-h-[200px]"
+                rows={1}
+                disabled={isLoading}
+              />
+              
+              {/* Mention Dropdown */}
+              {showMentionDropdown && filteredFiles.length > 0 && (
+                <div
+                  ref={dropdownRef}
+                  className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-[#2a2a2a] 
+                    border border-[rgba(255,255,255,0.08)] rounded-xl shadow-2xl z-50">
+
+                  {filteredFiles.map(file => (
+                    <button
+                      key={file}
+                      type="button"
+                      onClick={() => handleMentionSelect(file)}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-white/8 text-left text-sm text-white/90 
+                        transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-blue-400" />
+                      <span>{file}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              className="w-9 h-9 flex items-center justify-center bg-gradient-to-br from-blue-500 to-blue-600 
+                text-white rounded-[10px] transition-all duration-200 hover:scale-105 hover:shadow-[0_4px_12px_rgba(59,130,246,0.3)] 
+                active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 
+                disabled:hover:shadow-none flex-shrink-0"
+            >
+              <Send className="w-[18px] h-[18px]" />
+            </button>
           </div>
           
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="p-3 bg-accent-blue text-white rounded-lg hover:bg-blue-600 
-              disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          <p className="text-xs text-white/30 mt-2 text-center">
+            Pro tip: Use @ to mention files • Shift+Enter for new line
+          </p>
         </form>
-        
-        <p className="text-xs text-gray-500 mt-2 text-center">
-          Press @ to mention files • Enter to send • Shift+Enter for new line
-        </p>
       </div>
     </div>
   )
@@ -213,133 +217,167 @@ export function ChatInterface({ messages, onSendMessage, isLoading = false, avai
 
 function MessageBubble({ message }: { message: Message }) {
   const [showToolActivity, setShowToolActivity] = useState(false)
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
   const isUser = message.role === 'user'
   
-  const getToolIcon = (type: ToolActivity['type']) => {
-    switch (type) {
-      case 'search': return <Search className="w-3 h-3 text-accent-blue" />
-      case 'read': return <FileText className="w-3 h-3 text-accent-green" />
-      case 'write': return <PenTool className="w-3 h-3 text-accent-orange" />
-      case 'execute': return <Terminal className="w-3 h-3 text-accent-purple" />
-    }
+  const getToolIcon = () => {
+    return <div className="w-2 h-2 rounded-full bg-white/30 flex-shrink-0" />
   }
   
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
+  const toggleToolItem = (index: number) => {
+    const newExpanded = new Set(expandedTools)
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index)
+    } else {
+      newExpanded.add(index)
+    }
+    setExpandedTools(newExpanded)
+  }
+
   return (
-    <div className={`flex items-start gap-3 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0
-        ${isUser ? 'bg-accent-blue' : 'bg-accent-green'}`}
-      >
-        {isUser ? 'You' : 'AI'}
-      </div>
-      
-      <div className={`flex flex-col max-w-[80%] ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className={`rounded-lg px-4 py-3 ${isUser ? 'bg-accent-blue text-white' : 'bg-dark-surface text-gray-200'}`}>
-          {isUser ? (
-            <div className="whitespace-pre-wrap">{message.content}</div>
-          ) : (
-            <div className="prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-                components={{
-                  table: ({node, ...props}) => (
-                    <table className="border-collapse border border-gray-600 my-4" {...props} />
-                  ),
-                  thead: ({node, ...props}) => (
-                    <thead className="bg-gray-800" {...props} />
-                  ),
-                  th: ({node, ...props}) => (
-                    <th className="border border-gray-600 px-4 py-2 text-left" {...props} />
-                  ),
-                  td: ({node, ...props}) => (
-                    <td className="border border-gray-600 px-4 py-2" {...props} />
-                  ),
-                  code: ({node, className, children, ...props}) => {
-                    const match = /language-(\w+)/.exec(className || '')
-                    const isInline = !match
-                    return isInline ? 
-                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>{children}</code> :
-                      <code className="block bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props}>{children}</code>
-                  },
-                  pre: ({node, ...props}) => (
-                    <pre className="bg-gray-800 p-3 rounded my-2 overflow-x-auto" {...props} />
-                  ),
-                  ul: ({node, ...props}) => (
-                    <ul className="list-disc list-inside my-2" {...props} />
-                  ),
-                  ol: ({node, ...props}) => (
-                    <ol className="list-decimal list-inside my-2" {...props} />
-                  ),
-                  blockquote: ({node, ...props}) => (
-                    <blockquote className="border-l-4 border-accent-blue pl-4 italic my-2" {...props} />
-                  ),
-                  h1: ({node, ...props}) => (
-                    <h1 className="text-2xl font-bold mt-4 mb-2" {...props} />
-                  ),
-                  h2: ({node, ...props}) => (
-                    <h2 className="text-xl font-bold mt-3 mb-2" {...props} />
-                  ),
-                  h3: ({node, ...props}) => (
-                    <h3 className="text-lg font-bold mt-2 mb-1" {...props} />
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-          )}
+    <div className={`flex items-start gap-4 animate-slide-in ${isUser ? 'ml-auto max-w-[75%]' : 'mr-auto max-w-full'}`}>
+      {/* User messages: card style, Assistant messages: transparent */}
+      <div className="flex-1 pt-1">
+        <div className={`${isUser 
+          ? 'bg-[rgba(20,20,20,0.6)] backdrop-blur-[40px] border border-[rgba(255,255,255,0.06)] rounded-2xl px-4 py-4' 
+          : 'bg-transparent'
+        }`}>
+          <div className={`text-[15px] leading-[1.6] tracking-[-0.1px] ${isUser ? 'text-white/90' : 'text-white/90'}`}>
+            {isUser ? (
+              <div className="whitespace-pre-wrap">{message.content}</div>
+            ) : (
+              <div className="prose prose-invert prose-sm max-w-none [&_p]:mb-3 [&_p:last-child]:mb-0">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={{
+                    p: ({node, ...props}) => <p className="mb-3 last:mb-0" {...props} />,
+                    code: ({node, className, children, ...props}) => {
+                      const match = /language-(\w+)/.exec(className || '')
+                      const isInline = !match
+                      return isInline ? 
+                        <code className="bg-black/40 px-1.5 py-0.5 rounded text-sm text-[#a5d6ff]" {...props}>{children}</code> :
+                        <code className="block bg-black/40 border border-white/8 rounded-xl p-4 my-3 overflow-x-auto text-[13px] text-[#a5d6ff] font-mono" {...props}>{children}</code>
+                    },
+                    pre: ({node, ...props}) => (
+                      <pre className="bg-black/40 border border-white/8 rounded-xl p-4 my-3 overflow-x-auto" {...props} />
+                    ),
+                    ul: ({node, ...props}) => (
+                      <ul className="list-disc list-inside my-2 space-y-1" {...props} />
+                    ),
+                    ol: ({node, ...props}) => (
+                      <ol className="list-decimal list-inside my-2 space-y-1" {...props} />
+                    ),
+                    h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-4 mb-2" {...props} />,
+                    h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-3 mb-2" {...props} />,
+                    h3: ({node, ...props}) => <h3 className="text-lg font-bold mt-2 mb-1" {...props} />,
+                    strong: ({node, ...props}) => <strong className="font-semibold" {...props} />,
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-          <span>{formatTime(message.timestamp)}</span>
-          
-          {message.toolActivity && message.toolActivity.length > 0 && (
+        {/* Tool Activity Toggle - Only for assistant messages */}
+        {!isUser && message.toolActivity && message.toolActivity.length > 0 && (
+          <>
             <button
               onClick={() => setShowToolActivity(!showToolActivity)}
-              className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors"
-            >
-              <span>Tool Activity ({message.toolActivity.length})</span>
-              {showToolActivity ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
-          )}
-        </div>
-        
-        {showToolActivity && message.toolActivity && (
-          <div className="mt-2 bg-gray-900/50 backdrop-blur rounded-lg border border-gray-700 overflow-hidden w-full">
-            <div className="px-3 py-2 bg-gray-800/50 border-b border-gray-700">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                Tool Activity Log
+              className={`inline-flex items-center gap-2 px-3.5 py-2 mt-2 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-[10px] 
+                text-white/70 text-[13px] font-medium transition-all hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)] hover:text-white/90
+                ${showToolActivity ? 'bg-[rgba(255,255,255,0.08)] border-[rgba(255,255,255,0.12)]' : ''}`}>
+
+              <span>Tools Used</span>
+              <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 
+                bg-white/10 rounded-[11px] text-xs font-semibold text-white/90">
+                {message.toolActivity.length}
               </span>
-            </div>
-            <div className="p-3 space-y-2">
-              {message.toolActivity.map((activity, idx) => (
-                <div 
-                  key={idx} 
-                  className="flex items-start gap-3 p-2 rounded-md hover:bg-gray-800/50 transition-colors"
-                >
-                  <div className="mt-0.5 shrink-0">
-                    {getToolIcon(activity.type)}
+              <ChevronDown className={`w-4 h-4 text-white/50 transition-transform ${showToolActivity ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Tool Panel */}
+            {showToolActivity && (
+              <div className="mt-3 bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] rounded-xl overflow-hidden">
+                <div className="px-4 py-3.5 border-b border-[rgba(255,255,255,0.06)]">
+                  <div className="text-[11px] font-semibold text-white/50 uppercase tracking-[0.8px]">
+                    Execution Log
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-gray-200 break-words">{activity.description}</div>
-                    {activity.filePath && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        <FileText className="w-3 h-3 inline mr-1" />
-                        {activity.filePath}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {formatTime(activity.timestamp)}
-                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                <div className="p-2">
+                  {message.toolActivity.map((activity, idx) => (
+                    <div key={idx} className="mb-2 last:mb-0">
+                      <div 
+                        className="bg-transparent border border-[rgba(255,255,255,0.04)] rounded-lg overflow-hidden 
+                          transition-all hover:bg-[rgba(255,255,255,0.02)] hover:border-[rgba(255,255,255,0.08)]">
+
+                        <div 
+                          className="flex items-center gap-3 px-3 py-3 cursor-pointer"
+                          onClick={() => toggleToolItem(idx)}
+                        >
+                          {getToolIcon()}
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-medium text-white/90 font-mono mb-0.5">
+                              {activity.type}
+                            </div>
+                            <div className="text-[13px] text-white/50 truncate">
+                              {activity.description}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 text-xs text-white/30">
+                            <span className="font-mono">{formatTime(activity.timestamp)}</span>
+                            <ChevronDown className={`w-4 h-4 text-white/30 transition-transform flex-shrink-0 
+                              ${expandedTools.has(idx) ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+
+                        {expandedTools.has(idx) && (
+                          <div className="border-t border-[rgba(255,255,255,0.06)] bg-black/20">
+                            <div className="p-4">
+                              <div className="text-[11px] font-semibold text-white/40 uppercase tracking-[0.8px] mb-3">
+                                Details
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div>
+                                  <div className="text-[11px] font-semibold text-white/50 font-mono uppercase tracking-[0.5px] mb-1.5">
+                                    Description
+                                  </div>
+                                  <div className="text-[13px] text-white/90 font-mono px-3 py-2 bg-[rgba(255,255,255,0.02)] rounded-md border border-[rgba(255,255,255,0.04)]">
+                                    {activity.description}
+                                  </div>
+                                </div>
+                                
+                                {activity.filePath && (
+                                  <div>
+                                    <div className="text-[11px] font-semibold text-white/50 font-mono uppercase tracking-[0.5px] mb-1.5">
+                                      File Path
+                                    </div>
+                                    <div className="text-[13px] text-white/90 font-mono px-3 py-2 bg-[rgba(255,255,255,0.02)] rounded-md border border-[rgba(255,255,255,0.04)] break-all">
+                                      {activity.filePath}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -8,13 +8,20 @@ export default {
     extend: {
       colors: {
         'dark-bg': '#1e1e1e',
-        'dark-surface': '#252526',
-        'dark-hover': '#2d2d30',
-        'dark-border': '#3c3c3c',
-        'accent-blue': '#0078d4',
-        'accent-green': '#4ec9b0',
-        'accent-orange': '#ce9178',
-        'accent-purple': '#c586c0',
+        'dark-surface': '#2a2a2a',
+        'dark-hover': '#333333',
+        'dark-border': 'rgba(255, 255, 255, 0.08)',
+        'accent-blue': '#3b82f6',
+        'accent-green': '#10b981',
+        'accent-orange': '#f59e0b',
+        'accent-purple': '#8b5cf6',
+      },
+      backdropBlur: {
+        'xl': '40px',
+      },
+      fontFamily: {
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['SF Mono', 'Monaco', 'Consolas', 'Courier New', 'monospace'],
       },
     },
   },

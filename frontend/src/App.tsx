@@ -677,7 +677,7 @@ function App() {
   ]
 
   return (
-    <div className="h-screen flex flex-col bg-dark-bg">
+    <div className="h-screen flex flex-col bg-[#1e1e1e]">
       <TopBar 
         project={currentProject}
         projects={projects}
@@ -713,35 +713,35 @@ function App() {
         {/* Side Panel Toggle */}
         <button
           onClick={() => setShowSidePanel(!showSidePanel)}
-          className="p-2 hover:bg-dark-hover transition-colors self-start mt-2"
+          className="p-2 hover:bg-white/8 transition-all self-start mt-2 rounded-lg"
           title={showSidePanel ? 'Hide panel' : 'Show panel'}
         >
           {showSidePanel ? (
-            <PanelRightClose className="w-5 h-5 text-gray-400" />
+            <PanelRightClose className="w-5 h-5 text-white/50 hover:text-white/90" />
           ) : (
-            <PanelRightOpen className="w-5 h-5 text-gray-400" />
+            <PanelRightOpen className="w-5 h-5 text-white/50 hover:text-white/90" />
           )}
         </button>
         
         {/* Side Panel */}
         {showSidePanel && (
-          <div className="w-[50%] border-l border-dark-border flex flex-col">
+          <div className="w-[50%] border-l border-[rgba(255,255,255,0.06)] flex flex-col bg-[#2a2a2a]">
             {/* Panel Tabs */}
-            <div className="flex border-b border-dark-border">
+            <div className="flex border-b border-[rgba(255,255,255,0.06)]">
               {sidePanelTabs.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setSidePanel(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm transition-colors
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all
                     ${sidePanel === tab.id 
-                      ? 'text-white border-b-2 border-accent-blue bg-dark-surface' 
-                      : 'text-gray-400 hover:text-white hover:bg-dark-hover'
+                      ? 'text-white border-b-2 border-blue-500 bg-white/4' 
+                      : 'text-white/60 hover:text-white hover:bg-white/4'
                     }`}
                 >
                   <tab.icon className="w-4 h-4" />
                   {tab.label}
                   {tab.id === 'insights' && suggestions.length > 0 && (
-                    <span className="bg-accent-blue text-white text-xs px-1.5 rounded-full">
+                    <span className="bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
                       {suggestions.length}
                     </span>
                   )}
