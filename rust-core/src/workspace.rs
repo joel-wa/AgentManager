@@ -296,9 +296,14 @@ This file tracks decisions, discussions, and important changes.
             if let Ok(old_content) = fs::read_to_string(&file_path) {
                 // Only save version if content is different
                 if old_content != content {
+                    tracing::info!("Content changed for {}, saving version", path);
                     let _ = self.save_version(project_id, path, &old_content, None);
+                } else {
+                    tracing::info!("Content unchanged for {}, skipping version", path);
                 }
             }
+        } else if capture_version {
+            tracing::info!("File {} does not exist yet, no version to save", path);
         }
         
         // Create parent directories if needed
@@ -461,6 +466,39 @@ This file tracks decisions, discussions, and important changes.
             project_id
         );
 
+        Ok(())
+    }
+
+    /// Delete a file (with version tracking)
+    pub fn delete_file(&self, project_id: &str, file_path: &str) -> anyhow::Result<()> {
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        
+        let full_path = self.get_project_dir(&project).join(file_path);
+        
+        if !full_path.exists() {
+            return Err(anyhow::anyhow!("File does not exist: {}", file_path));
+        }
+        
+        if full_path.is_dir() {
+            return Err(anyhow::anyhow!("Path is a directory, not a file: {}", file_path));
+        }
+        
+        // Save version before deleting
+        if let Ok(content) = fs::read_to_string(&full_path) {
+            let message = format!("File deleted at {}", Utc::now().format("%Y-%m-%d %H:%M:%S"));
+            let _ = self.save_version(project_id, file_path, &content, Some(message));
+        }
+        
+        // Delete the file
+        fs::remove_file(&full_path)?;
+        
+        tracing::info!(
+            "Deleted file {} (project: {}), version saved",
+            file_path,
+            project_id
+        );
+        
         Ok(())
     }
 }

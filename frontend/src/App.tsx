@@ -104,25 +104,7 @@ function App() {
   
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
-  const [timeline, setTimeline] = useState<TimelineEntry[]>([
-    {
-      id: '1',
-      timestamp: new Date(Date.now() - 3600000),
-      title: 'Researched authentication patterns',
-      files: [
-        { action: 'read', path: 'strategy.md' },
-        { action: 'write', path: 'oauth_notes.md' }
-      ]
-    },
-    {
-      id: '2',
-      timestamp: new Date(Date.now() - 7200000),
-      title: 'Implemented login flow',
-      files: [
-        { action: 'write', path: 'login_handler.py' }
-      ]
-    }
-  ])
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([])
 
   // Check backend health on mount
   useEffect(() => {

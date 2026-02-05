@@ -736,6 +736,9 @@ class DeleteFileTool(BaseTool):
     
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", "")
+        project_id = args.get("_project_id")
+        rust_core_url = args.get("_rust_core_url", "http://localhost:8000")
+        working_directory = args.get("_working_directory")
         
         if not path:
             return ToolResult(
@@ -744,6 +747,46 @@ class DeleteFileTool(BaseTool):
                 error="No path provided"
             )
         
+        # If we have a project_id, use Rust Core API for version tracking
+        if project_id and working_directory:
+            try:
+                # Calculate relative path from working directory
+                abs_path = path if os.path.isabs(path) else path
+                if os.path.isabs(abs_path) and working_directory:
+                    # Make path relative to project root
+                    rel_path = os.path.relpath(abs_path, working_directory)
+                else:
+                    rel_path = path
+                
+                # Call Rust Core API
+                import httpx
+                from urllib.parse import quote
+                
+                api_url = f"{rust_core_url}/api/projects/{project_id}/files/{quote(rel_path, safe='')}"
+                
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.delete(api_url)
+                    
+                    if response.status_code == 200:
+                        return ToolResult(
+                            success=True,
+                            result={
+                                "path": rel_path,
+                                "deleted": True,
+                                "version_tracked": True
+                            }
+                        )
+                    else:
+                        return ToolResult(
+                            success=False,
+                            result=None,
+                            error=f"API error: {response.status_code} - {response.text}"
+                        )
+            except Exception as e:
+                # Fall back to direct file delete if API fails
+                print(f"[DELETE_FILE] API call failed, falling back to direct delete: {e}")
+        
+        # Fallback: Direct file delete (no version tracking)
         try:
             if not os.path.exists(path):
                 return ToolResult(
@@ -764,7 +807,8 @@ class DeleteFileTool(BaseTool):
                 success=True,
                 result={
                     "path": path,
-                    "deleted": True
+                    "deleted": True,
+                    "version_tracked": False
                 }
             )
         except PermissionError:
@@ -885,8 +929,8 @@ class ToolExecutor:
             if tool_name == 'execute_command' and 'working_directory' not in resolved_args:
                 resolved_args['working_directory'] = self._working_directory
         
-        # Inject project_id and rust_core_url for write_file tool
-        if tool_name == 'write_file':
+        # Inject project_id and rust_core_url for write_file and delete_file tools
+        if tool_name in ['write_file', 'delete_file']:
             resolved_args['_project_id'] = self._project_id
             resolved_args['_rust_core_url'] = self._rust_core_url
             resolved_args['_working_directory'] = self._working_directory

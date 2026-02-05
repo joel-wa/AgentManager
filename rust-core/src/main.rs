@@ -84,6 +84,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/projects/:id/restore/:version/*path", post(api::restore_file_version))
         .route("/projects/:id/files/*path", get(api::get_file))
         .route("/projects/:id/files/*path", post(api::write_file))
+        .route("/projects/:id/files/*path", axum::routing::delete(api::delete_file))
         .route("/projects/:id/timeline", get(api::get_timeline))
         .route("/projects/:id/suggestions", get(api::get_suggestions))
         .route("/projects/:id/suggestions/stream", get(api::stream_suggestions))

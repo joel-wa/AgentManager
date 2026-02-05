@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { History, Check, X, ChevronDown, ChevronRight, Clock, FileText, AlertCircle } from 'lucide-react'
+import { History, Check, X, ChevronDown, ChevronRight, Clock, FileText, AlertCircle, RefreshCw } from 'lucide-react'
 import type { VersionHistory, VersionMetadata } from '../services/api'
 import { api } from '../services/api'
 
@@ -9,9 +9,10 @@ type Props = {
   fileName: string
   onRestore?: (version: number) => void
   onClose?: () => void
+  refreshKey?: string | number  // Trigger refresh when this changes
 }
 
-export function FileVersionHistory({ projectId, filePath, fileName, onRestore, onClose }: Props) {
+export function FileVersionHistory({ projectId, filePath, fileName, onRestore, onClose, refreshKey }: Props) {
   const [history, setHistory] = useState<VersionHistory | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,13 +22,19 @@ export function FileVersionHistory({ projectId, filePath, fileName, onRestore, o
 
   useEffect(() => {
     loadVersionHistory()
-  }, [projectId, filePath])
+  }, [projectId, filePath, refreshKey])
 
   const loadVersionHistory = async () => {
     setLoading(true)
     setError(null)
     try {
       const data = await api.listFileVersions(projectId, filePath)
+      console.log('[FileVersionHistory] Loaded version history:', {
+        filePath,
+        currentVersion: data.current_version,
+        totalVersions: data.versions.length,
+        versions: data.versions
+      })
       setHistory(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load version history')
@@ -130,14 +137,24 @@ export function FileVersionHistory({ projectId, filePath, fileName, onRestore, o
           <History className="w-4 h-4" />
           <span className="text-sm font-medium">Version History</span>
         </div>
-        {onClose && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-dark-hover rounded transition-colors"
+            onClick={loadVersionHistory}
+            disabled={loading}
+            className="p-1.5 hover:bg-dark-hover rounded transition-colors disabled:opacity-50 group"
+            title="Refresh version history"
           >
-            <X className="w-4 h-4 text-gray-400" />
+            <RefreshCw className={`w-4 h-4 text-gray-400 group-hover:text-white transition-colors ${loading ? 'animate-spin' : ''}`} />
           </button>
-        )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-dark-hover rounded transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-4 p-3 bg-dark-surface rounded-lg">

@@ -366,18 +366,8 @@ pub async fn get_timeline(
     State(_state): State<Arc<RwLock<AppState>>>,
     Path(_id): Path<String>,
 ) -> Json<Vec<TimelineEntry>> {
-    // Return mock timeline for now
-    Json(vec![
-        TimelineEntry {
-            id: Uuid::new_v4().to_string(),
-            timestamp: Utc::now(),
-            title: "Researched authentication patterns".to_string(),
-            files: vec![
-                FileAction { action: "read".to_string(), path: "strategy.md".to_string() },
-                FileAction { action: "write".to_string(), path: "oauth_notes.md".to_string() },
-            ],
-        },
-    ])
+    // Return empty timeline - real entries come from maintenance agent
+    Json(vec![])
 }
 
 /// Get maintenance suggestions
@@ -600,7 +590,13 @@ pub async fn list_file_versions(
 ) -> Result<Json<VersionHistory>, StatusCode> {
     let state = state.read().await;
     match state.workspace.list_versions(&id, &path) {
-        Ok(history) => Ok(Json(history)),
+        Ok(history) => {
+            tracing::info!(
+                "Returning version history for {} in project {}: {} versions (current: v{})",
+                path, id, history.versions.len(), history.current_version
+            );
+            Ok(Json(history))
+        },
         Err(e) => {
             tracing::error!("Failed to list versions: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
@@ -642,6 +638,30 @@ pub async fn restore_file_version(
         }
         Err(e) => {
             tracing::error!("Failed to restore version: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Delete a file (with version tracking)
+pub async fn delete_file(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Path((id, path)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    let state = state.read().await;
+    match state.workspace.delete_file(&id, &path) {
+        Ok(_) => {
+            // Notify maintenance agent of file deletion (non-blocking)
+            let project_id = id.clone();
+            let file_path = path.clone();
+            tokio::spawn(async move {
+                let _ = notify_file_change(&project_id, &file_path, "deleted").await;
+            });
+            
+            Ok(StatusCode::OK)
+        }
+        Err(e) => {
+            tracing::error!("Failed to delete file: {}", e);
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }

@@ -13,6 +13,9 @@ export function Timeline({ entries, projectId, onVersionRestore }: Props) {
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set())
   const [viewingVersions, setViewingVersions] = useState<{ path: string; name: string } | null>(null)
 
+  // Use entries length as refresh key - triggers version history refresh when new entries added
+  const refreshKey = entries.length
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -57,6 +60,7 @@ export function Timeline({ entries, projectId, onVersionRestore }: Props) {
         fileName={viewingVersions.name}
         onRestore={handleVersionRestore}
         onClose={() => setViewingVersions(null)}
+        refreshKey={refreshKey}
       />
     )
   }

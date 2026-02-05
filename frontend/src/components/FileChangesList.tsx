@@ -12,6 +12,9 @@ type Props = {
 export function FileChangesList({ fileChanges, projectId, onVersionRestore }: Props) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
   const [viewingVersions, setViewingVersions] = useState<{ path: string; name: string } | null>(null)
+  
+  // Use fileChanges length as refresh key - changes when new file changes arrive
+  const refreshKey = fileChanges.length
 
   if (fileChanges.length === 0) return null
 
@@ -46,6 +49,7 @@ export function FileChangesList({ fileChanges, projectId, onVersionRestore }: Pr
           fileName={viewingVersions.name}
           onRestore={handleVersionRestore}
           onClose={() => setViewingVersions(null)}
+          refreshKey={refreshKey}
         />
       </div>
     )
