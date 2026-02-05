@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimalist Tool Activity - Light Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            min-height: 100vh;
+            padding: 48px 24px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Message */
+        .message {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.06);
+            color: rgba(0, 0, 0, 0.8);
+        }
+
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(0, 0, 0, 0.85);
+            margin-bottom: 12px;
+        }
+
+        /* Tool Activity Toggle - Minimalist */
+        .tool-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            color: rgba(0, 0, 0, 0.65);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-toggle:hover {
+            background: rgba(0, 0, 0, 0.06);
+            border-color: rgba(0, 0, 0, 0.15);
+            color: rgba(0, 0, 0, 0.85);
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            background: rgba(0, 0, 0, 0.08);
+            border-radius: 11px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Tool Panel - Ultra Clean */
+        .tool-panel {
+            margin-top: 12px;
+            background: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        .tool-panel.hidden {
+            display: none;
+        }
+
+        .panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+            background: rgba(0, 0, 0, 0.01);
+        }
+
+        .panel-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.45);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* Tool Items - Monochromatic */
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            background: transparent;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-item:hover {
+            background: rgba(0, 0, 0, 0.02);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* Tool Header */
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            cursor: pointer;
+        }
+
+        /* Single accent dot instead of colored icons */
+        .tool-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.25);
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:hover .tool-indicator {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .tool-item.expanded .tool-indicator {
+            background: #000;
+        }
+
+        .tool-summary {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(0, 0, 0, 0.85);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            margin-bottom: 3px;
+        }
+
+        .tool-brief {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(0, 0, 0, 0.35);
+        }
+
+        .tool-time {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        .expand-icon {
+            width: 16px;
+            height: 16px;
+            color: rgba(0, 0, 0, 0.35);
+            transition: transform 0.2s ease;
+        }
+
+        .tool-item.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Tool Details - Clean Typography */
+        .tool-details {
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+            background: rgba(0, 0, 0, 0.02);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .tool-item.expanded .tool-details {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .details-section {
+            padding: 16px;
+        }
+
+        .details-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 12px;
+        }
+
+        /* Arguments - Minimal Style */
+        .args-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .arg-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .arg-key {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(0, 0, 0, 0.5);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .arg-value {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.85);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            word-break: break-word;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 6px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .arg-value.long {
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 150px;
+            overflow-y: auto;
+            color: rgba(0, 0, 0, 0.7);
+        }
+
+        svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="message">
+            <div class="avatar">AI</div>
+            <div class="message-content">
+                <div class="message-text">
+                    <p>I've created the anime apocalypse bedroom concept document and updated your recent activity log.</p>
+                </div>
+
+                <button class="tool-toggle" onclick="togglePanel()">
+                    <span>Tools Used</span>
+                    <span class="tool-badge">2</span>
+                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                </button>
+
+                <div class="tool-panel hidden" id="toolPanel">
+                    <div class="panel-header">
+                        <div class="panel-title">Execution Log</div>
+                    </div>
+
+                    <div class="tool-items">
+                        <div class="tool-item" id="tool1">
+                            <div class="tool-header" onclick="toggleTool('tool1')">
+                                <div class="tool-indicator"></div>
+                                <div class="tool-summary">
+                                    <div class="tool-name">write_file</div>
+                                    <div class="tool-brief">video-concepts/anime-apocalypse-bedroom.md</div>
+                                </div>
+                                <div class="tool-meta">
+                                    <span class="tool-time">06:22</span>
+                                    <span>3.2 KB</span>
+                                </div>
+                                <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+
+                            <div class="tool-details">
+                                <div class="details-section">
+                                    <div class="details-label">Arguments</div>
+                                    <div class="args-grid">
+                                        <div class="arg-item">
+                                            <div class="arg-key">path</div>
+                                            <div class="arg-value">video-concepts/anime-apocalypse-bedroom.md</div>
+                                        </div>
+                                        <div class="arg-item">
+                                            <div class="arg-key">content</div>
+                                            <div class="arg-value long"># I Survived Anime Apocalypse in My Bedroom - Full Concept
+
+## Core Concept
+Transform normal bedroom into anime apocalypse scenario using AI video editing while maintaining real reactions and challenges.
+
+## Why This Works (Manhwa/Apocalypse Survival Appeal)
+- Progression systems (leveling up, finding supplies)
+- Choice consequences (bad decisions = disaster)
+- World-building details (how the apocalypse works)
+- Personal stakes (survival, protecting something/someone)
+- Immersive "what would I do?" factor
+- Binge-watchable content structure</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tool-item" id="tool2">
+                            <div class="tool-header" onclick="toggleTool('tool2')">
+                                <div class="tool-indicator"></div>
+                                <div class="tool-summary">
+                                    <div class="tool-name">write_file</div>
+                                    <div class="tool-brief">Recents.md</div>
+                                </div>
+                                <div class="tool-meta">
+                                    <span class="tool-time">06:22</span>
+                                    <span>1.1 KB</span>
+                                </div>
+                                <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </div>
+
+                            <div class="tool-details">
+                                <div class="details-section">
+                                    <div class="details-label">Arguments</div>
+                                    <div class="args-grid">
+                                        <div class="arg-item">
+                                            <div class="arg-key">path</div>
+                                            <div class="arg-value">Recents.md</div>
+                                        </div>
+                                        <div class="arg-item">
+                                            <div class="arg-key">content</div>
+                                            <div class="arg-value long"># Recent Activity
+
+## 2024-01-XX - Anime Apocalypse Bedroom Concept Development
+
+### Major Breakthrough
+- Identified "I Survived Anime Apocalypse in My Bedroom" as core concept
+- Analyzed manhwa/apocalypse survival content appeal
+- Mapped out AI + real room production approach
+
+### Key Insights
+- Manhwa audience craves progression systems and choice consequences
+- Real reactions + AI transformations = unique selling point
+- Interactive elements crucial for engagement</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePanel() {
+            const panel = document.getElementById('toolPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function toggleTool(id) {
+            const tool = document.getElementById(id);
+            tool.classList.toggle('expanded');
+        }
+    </script>
+</body>
+</html>
