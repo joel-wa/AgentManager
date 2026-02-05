@@ -63,9 +63,15 @@
         /* Message Bubble */
         .message {
             display: flex;
-            gap: 16px;
-            align-items: flex-start;
             animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: center;
         }
 
         @keyframes slideIn {
@@ -79,33 +85,19 @@
             }
         }
 
-        /* Avatar */
-        .avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-
-        .avatar.user {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: #ffffff;
-        }
-
-        .avatar.assistant {
-            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
-            color: #ffffff;
-        }
-
         /* Message Content */
         .message-content {
-            flex: 1;
-            padding-top: 4px;
+            max-width: 70%;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border-radius: 18px;
+            padding: 12px 16px;
+        }
+
+        .message.assistant .message-content {
+            max-width: 100%;
         }
 
         .message-text {
@@ -113,6 +105,10 @@
             line-height: 1.6;
             color: rgba(0, 0, 0, 0.85);
             letter-spacing: -0.1px;
+        }
+
+        .message.user .message-text {
+            color: #ffffff;
         }
 
         .message-text p {
@@ -329,8 +325,7 @@
         <!-- Messages Area -->
         <div class="messages-area" id="messages">
             <!-- Assistant Message -->
-            <div class="message">
-                <div class="avatar assistant">AI</div>
+            <div class="message assistant">
                 <div class="message-content">
                     <div class="message-text">
                         <p>Hello! I'm your AI workspace assistant. I can help you organize notes, search through your files, and maintain your knowledge base.</p>
@@ -340,8 +335,7 @@
             </div>
 
             <!-- User Message -->
-            <div class="message">
-                <div class="avatar user">YO</div>
+            <div class="message user">
                 <div class="message-content">
                     <div class="message-text">
                         <p>I need to refactor the authentication module and update the API documentation.</p>
@@ -350,8 +344,7 @@
             </div>
 
             <!-- Assistant Message with Code -->
-            <div class="message">
-                <div class="avatar assistant">AI</div>
+            <div class="message assistant">
                 <div class="message-content">
                     <div class="message-text">
                         <p>I'll help you with that. Let me analyze your authentication module first.</p>
@@ -449,9 +442,8 @@ const authenticateUser = async (credentials) => {
                 // Add user message to chat
                 const messagesArea = document.getElementById('messages');
                 const messageDiv = document.createElement('div');
-                messageDiv.className = 'message';
+                messageDiv.className = 'message user';
                 messageDiv.innerHTML = `
-                    <div class="avatar user">YO</div>
                     <div class="message-content">
                         <div class="message-text">
                             <p>${text}</p>
@@ -470,9 +462,8 @@ const authenticateUser = async (credentials) => {
                 // Show typing indicator
                 setTimeout(() => {
                     const typingDiv = document.createElement('div');
-                    typingDiv.className = 'message';
+                    typingDiv.className = 'message assistant';
                     typingDiv.innerHTML = `
-                        <div class="avatar assistant">AI</div>
                         <div class="message-content">
                             <div class="typing-indicator">
                                 <div class="typing-dot"></div>
