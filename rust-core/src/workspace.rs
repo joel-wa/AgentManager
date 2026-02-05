@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::fs;
+use sha2::{Sha256, Digest};
+use chrono::Utc;
 
-use crate::models::{Project, FileItem, FileType};
+use crate::models::{Project, FileItem, FileType, VersionMetadata, VersionEntry, VersionHistory};
 
 /// Manages the workspace directory and projects
 pub struct WorkspaceManager {
@@ -284,6 +286,16 @@ This file tracks decisions, discussions, and important changes.
         
         let file_path = self.get_project_dir(&project).join(path);
         
+        // Save version before writing (if file exists)
+        if file_path.exists() {
+            if let Ok(old_content) = fs::read_to_string(&file_path) {
+                // Only save version if content is different
+                if old_content != content {
+                    let _ = self.save_version(project_id, path, &old_content, None);
+                }
+            }
+        }
+        
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;
@@ -291,6 +303,148 @@ This file tracks decisions, discussions, and important changes.
         
         fs::write(&file_path, content)?;
         tracing::info!("Wrote file: {:?}", file_path);
+        Ok(())
+    }
+
+    /// Calculate SHA256 hash of content
+    fn calculate_hash(content: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Get version storage directory for a file
+    fn get_version_dir(&self, project_id: &str, file_path: &str) -> PathBuf {
+        // Sanitize file path to create a safe directory name
+        let sanitized = file_path.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+        
+        self.workspace_root
+            .join("projects")
+            .join(project_id)
+            .join(".meta")
+            .join("versions")
+            .join(sanitized)
+    }
+
+    /// Save a version of a file
+    pub fn save_version(
+        &self,
+        project_id: &str,
+        file_path: &str,
+        content: &str,
+        message: Option<String>,
+    ) -> anyhow::Result<VersionMetadata> {
+        let version_dir = self.get_version_dir(project_id, file_path);
+        fs::create_dir_all(&version_dir)?;
+
+        // Load or create version history
+        let history_file = version_dir.join("history.json");
+        let mut history = if history_file.exists() {
+            let content = fs::read_to_string(&history_file)?;
+            serde_json::from_str::<VersionHistory>(&content)?
+        } else {
+            VersionHistory {
+                file_path: file_path.to_string(),
+                current_version: 0,
+                versions: Vec::new(),
+            }
+        };
+
+        // Create new version
+        let new_version = history.current_version + 1;
+        let metadata = VersionMetadata {
+            version: new_version,
+            timestamp: Utc::now(),
+            file_size: content.len() as u64,
+            content_hash: Self::calculate_hash(content),
+            message,
+        };
+
+        // Save version content
+        let version_file = version_dir.join(format!("v{:04}.txt", new_version));
+        fs::write(&version_file, content)?;
+
+        // Update history
+        history.current_version = new_version;
+        history.versions.push(metadata.clone());
+        fs::write(&history_file, serde_json::to_string_pretty(&history)?)?;
+
+        tracing::info!(
+            "Saved version {} for file: {} (project: {})",
+            new_version,
+            file_path,
+            project_id
+        );
+
+        Ok(metadata)
+    }
+
+    /// List all versions of a file
+    pub fn list_versions(&self, project_id: &str, file_path: &str) -> anyhow::Result<VersionHistory> {
+        let version_dir = self.get_version_dir(project_id, file_path);
+        let history_file = version_dir.join("history.json");
+
+        if !history_file.exists() {
+            return Ok(VersionHistory {
+                file_path: file_path.to_string(),
+                current_version: 0,
+                versions: Vec::new(),
+            });
+        }
+
+        let content = fs::read_to_string(&history_file)?;
+        Ok(serde_json::from_str(&content)?)
+    }
+
+    /// Get a specific version of a file
+    pub fn get_version(&self, project_id: &str, file_path: &str, version: u32) -> anyhow::Result<VersionEntry> {
+        let version_dir = self.get_version_dir(project_id, file_path);
+        let version_file = version_dir.join(format!("v{:04}.txt", version));
+
+        if !version_file.exists() {
+            return Err(anyhow::anyhow!("Version {} not found", version));
+        }
+
+        let content = fs::read_to_string(&version_file)?;
+
+        // Get metadata from history
+        let history = self.list_versions(project_id, file_path)?;
+        let metadata = history
+            .versions
+            .iter()
+            .find(|v| v.version == version)
+            .ok_or_else(|| anyhow::anyhow!("Version metadata not found"))?
+            .clone();
+
+        Ok(VersionEntry { metadata, content })
+    }
+
+    /// Restore a specific version of a file
+    pub fn restore_version(&self, project_id: &str, file_path: &str, version: u32) -> anyhow::Result<()> {
+        // Get the version content
+        let version_entry = self.get_version(project_id, file_path, version)?;
+
+        // Save current version before restoring
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        let current_file_path = self.get_project_dir(&project).join(file_path);
+
+        if current_file_path.exists() {
+            let current_content = fs::read_to_string(&current_file_path)?;
+            let message = format!("Before restoring to version {}", version);
+            let _ = self.save_version(project_id, file_path, &current_content, Some(message));
+        }
+
+        // Restore the version
+        self.write_file(project_id, file_path, &version_entry.content)?;
+
+        tracing::info!(
+            "Restored file {} to version {} (project: {})",
+            file_path,
+            version,
+            project_id
+        );
+
         Ok(())
     }
 }

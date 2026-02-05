@@ -245,3 +245,29 @@ fn default_workspace_root() -> String {
             }
         })
 }
+
+/// Version metadata for file version tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionMetadata {
+    pub version: u32,
+    pub timestamp: DateTime<Utc>,
+    pub file_size: u64,
+    pub content_hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Version entry containing metadata and content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionEntry {
+    pub metadata: VersionMetadata,
+    pub content: String,
+}
+
+/// Version history for a file
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VersionHistory {
+    pub file_path: String,
+    pub current_version: u32,
+    pub versions: Vec<VersionMetadata>,
+}

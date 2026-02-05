@@ -24,6 +24,7 @@ anyhow = "1"
 directories = "5"
 dirs = "5"
 async-stream = "0.3"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = 3

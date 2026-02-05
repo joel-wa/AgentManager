@@ -592,3 +592,57 @@ pub async fn stream_suggestions(
         }
     }
 }
+
+/// List all versions of a file
+pub async fn list_file_versions(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Path((id, path)): Path<(String, String)>,
+) -> Result<Json<VersionHistory>, StatusCode> {
+    let state = state.read().await;
+    match state.workspace.list_versions(&id, &path) {
+        Ok(history) => Ok(Json(history)),
+        Err(e) => {
+            tracing::error!("Failed to list versions: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Get a specific version of a file
+pub async fn get_file_version(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Path((id, path, version)): Path<(String, String, u32)>,
+) -> Result<Json<VersionEntry>, StatusCode> {
+    let state = state.read().await;
+    match state.workspace.get_version(&id, &path, version) {
+        Ok(entry) => Ok(Json(entry)),
+        Err(e) => {
+            tracing::error!("Failed to get version: {}", e);
+            Err(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+/// Restore a file to a specific version
+pub async fn restore_file_version(
+    State(state): State<Arc<RwLock<AppState>>>,
+    Path((id, path, version)): Path<(String, String, u32)>,
+) -> Result<StatusCode, StatusCode> {
+    let state = state.read().await;
+    match state.workspace.restore_version(&id, &path, version) {
+        Ok(_) => {
+            // Notify maintenance agent of file change (non-blocking)
+            let project_id = id.clone();
+            let file_path = path.clone();
+            tokio::spawn(async move {
+                let _ = notify_file_change(&project_id, &file_path, "restored").await;
+            });
+            
+            Ok(StatusCode::OK)
+        }
+        Err(e) => {
+            tracing::error!("Failed to restore version: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
