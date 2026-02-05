@@ -7,7 +7,7 @@ import { TopBar } from './components/TopBar'
 import { NewProjectModal } from './components/NewProjectModal'
 import { FileViewer } from './components/FileViewer'
 import { SettingsModal } from './components/SettingsModal'
-import { ChatTabs, ChatTab } from './components/ChatTabs'
+import type { ChatTab } from './components/ChatTabs'
 import { api } from './services/api'
 import { 
   FolderTree, 
@@ -686,18 +686,12 @@ function App() {
         onProjectChange={handleProjectChange}
         onSettingsClick={() => setShowSettingsModal(true)}
         suggestionCount={suggestions.length}
+        chatTabs={chatTabs}
+        activeTabId={activeTabId}
+        onTabChange={handleTabChange}
+        onTabClose={handleTabClose}
+        onNewTab={createNewTab}
       />
-      
-      {/* Chat Tabs */}
-      {chatTabs.length > 0 && (
-        <ChatTabs
-          tabs={chatTabs}
-          activeTabId={activeTabId}
-          onTabChange={handleTabChange}
-          onTabClose={handleTabClose}
-          onNewTab={createNewTab}
-        />
-      )}
       
       <div className="flex-1 flex overflow-hidden">
         {/* Main Chat Area */}
