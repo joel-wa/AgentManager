@@ -280,14 +280,19 @@ This file tracks decisions, discussions, and important changes.
 
     /// Write file content
     pub fn write_file(&self, project_id: &str, path: &str, content: &str) -> anyhow::Result<()> {
+        self.write_file_internal(project_id, path, content, true)
+    }
+
+    /// Write file content with optional version capture
+    fn write_file_internal(&self, project_id: &str, path: &str, content: &str, capture_version: bool) -> anyhow::Result<()> {
         // Load project to get its location
         let project = self.get_project(project_id)?
             .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
         
         let file_path = self.get_project_dir(&project).join(path);
         
-        // Save version before writing (if file exists)
-        if file_path.exists() {
+        // Save version before writing (if file exists and capture is enabled)
+        if capture_version && file_path.exists() {
             if let Ok(old_content) = fs::read_to_string(&file_path) {
                 // Only save version if content is different
                 if old_content != content {
@@ -315,15 +320,16 @@ This file tracks decisions, discussions, and important changes.
 
     /// Get version storage directory for a file
     fn get_version_dir(&self, project_id: &str, file_path: &str) -> PathBuf {
-        // Sanitize file path to create a safe directory name
-        let sanitized = file_path.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+        // Use base64 encoding to avoid path collisions while keeping it readable
+        use base64::{Engine as _, engine::general_purpose};
+        let encoded = general_purpose::URL_SAFE_NO_PAD.encode(file_path.as_bytes());
         
         self.workspace_root
             .join("projects")
             .join(project_id)
             .join(".meta")
             .join("versions")
-            .join(sanitized)
+            .join(encoded)
     }
 
     /// Save a version of a file
@@ -360,8 +366,12 @@ This file tracks decisions, discussions, and important changes.
             message,
         };
 
-        // Save version content
-        let version_file = version_dir.join(format!("v{:04}.txt", new_version));
+        // Save version content (preserve original extension or use .dat for unknown)
+        let extension = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("dat");
+        let version_file = version_dir.join(format!("v{:04}.{}", new_version, extension));
         fs::write(&version_file, content)?;
 
         // Update history
@@ -399,7 +409,13 @@ This file tracks decisions, discussions, and important changes.
     /// Get a specific version of a file
     pub fn get_version(&self, project_id: &str, file_path: &str, version: u32) -> anyhow::Result<VersionEntry> {
         let version_dir = self.get_version_dir(project_id, file_path);
-        let version_file = version_dir.join(format!("v{:04}.txt", version));
+        
+        // Get the extension from the original file path
+        let extension = std::path::Path::new(file_path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("dat");
+        let version_file = version_dir.join(format!("v{:04}.{}", version, extension));
 
         if !version_file.exists() {
             return Err(anyhow::anyhow!("Version {} not found", version));
@@ -435,8 +451,8 @@ This file tracks decisions, discussions, and important changes.
             let _ = self.save_version(project_id, file_path, &current_content, Some(message));
         }
 
-        // Restore the version
-        self.write_file(project_id, file_path, &version_entry.content)?;
+        // Restore the version without triggering version capture again
+        self.write_file_internal(project_id, file_path, &version_entry.content, false)?;
 
         tracing::info!(
             "Restored file {} to version {} (project: {})",
