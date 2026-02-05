@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Chat Interface - Dark Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 24px;
+            min-height: 0;
+        }
+
+        /* Messages Area */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 48px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            min-height: 0;
+        }
+
+        /* Smooth scrollbar */
+        .messages-area::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .messages-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 3px;
+            transition: background 0.2s ease;
+        }
+
+        .messages-area:hover::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .messages-area::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Message Bubble */
+        .message {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Right align user messages */
+        .message.user-message {
+            margin-left: auto;
+            max-width: 75%;
+        }
+
+        /* Assistant messages stay left aligned */
+        .message.assistant-message {
+            margin-right: auto;
+            max-width: 100%;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Avatar - Hidden */
+        .avatar {
+            display: none;
+        }
+
+        /* Message Content */
+        .message-content {
+            flex: 1;
+            padding-top: 4px;
+        }
+
+        /* User message - has card style */
+        .message.user-message .message-content {
+            background: rgba(20, 20, 20, 0.6);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        /* Assistant message - no card style, transparent */
+        .message.assistant-message .message-content {
+            background: transparent;
+            padding: 0;
+        }
+
+        .message-text {
+            font-size: 15px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.9);
+            letter-spacing: -0.1px;
+        }
+
+        .message-text p {
+            margin-bottom: 12px;
+        }
+
+        .message-text p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            color: #a5d6ff;
+        }
+
+        /* Input Container */
+        .input-container {
+            padding: 24px 0;
+            position: sticky;
+            bottom: 0;
+            background: linear-gradient(180deg, transparent 0%, #1e1e1e 20%);
+        }
+
+        /* Mentioned Files Pills */
+        .mentioned-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .file-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 20px;
+            font-size: 13px;
+            color: #60a5fa;
+            transition: all 0.2s ease;
+        }
+
+        .file-pill:hover {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .file-pill-close {
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background 0.2s ease;
+        }
+
+        .file-pill-close:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        /* Input Wrapper */
+        .input-wrapper {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 12px 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .input-wrapper:focus-within {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08);
+        }
+
+        /* Attach Button */
+        .attach-button {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .attach-button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        /* Input Field */
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 15px;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            line-height: 1.5;
+            max-height: 200px;
+        }
+
+        textarea::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Send Button */
+        .send-button {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-shrink: 0;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .send-button:active {
+            transform: scale(0.95);
+        }
+
+        .send-button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Helper Text */
+        .helper-text {
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 8px;
+        }
+
+        /* Icons */
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Loading indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 6px;
+            padding: 16px 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            animation: typing 1.4s ease-in-out infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.4;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        /* Tool Activity Toggle - Minimalist */
+        .tool-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 8px;
+        }
+
+        .tool-toggle:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .tool-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 7px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 11px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .toggle-icon {
+            width: 16px;
+            height: 16px;
+            color: rgba(255, 255, 255, 0.5);
+            transition: transform 0.2s ease;
+        }
+
+        .tool-toggle.expanded .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Tool Panel - Ultra Clean */
+        .tool-panel {
+            margin-top: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.3s ease;
+        }
+
+        .tool-panel.expanded {
+            max-height: 800px;
+        }
+
+        .panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .panel-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* Tool Items - Monochromatic */
+        .tool-items {
+            padding: 8px;
+        }
+
+        .tool-item {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Tool Header */
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            cursor: pointer;
+        }
+
+        /* Single accent dot instead of colored icons */
+        .tool-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            flex-shrink: 0;
+            transition: all 0.2s ease;
+        }
+
+        .tool-item:hover .tool-indicator {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .tool-item.expanded .tool-indicator {
+            background: #fff;
+        }
+
+        .tool-summary {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .tool-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            margin-bottom: 3px;
+        }
+
+        .tool-brief {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .tool-time {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+        }
+
+        .expand-icon {
+            width: 16px;
+            height: 16px;
+            color: rgba(255, 255, 255, 0.3);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .tool-item.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Tool Details - Clean Typography */
+        .tool-details {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(0, 0, 0, 0.2);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .tool-item.expanded .tool-details {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .details-section {
+            padding: 16px;
+        }
+
+        .details-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 12px;
+        }
+
+        /* Arguments - Minimal Style */
+        .args-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .arg-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .arg-key {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .arg-value {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            word-break: break-word;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .arg-value.long {
+            font-size: 12px;
+            line-height: 1.6;
+            max-height: 150px;
+            overflow-y: auto;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .arg-value.long::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .arg-value.long::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .arg-value.long::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Messages Area -->
+        <div class="messages-area" id="messages">
+            <!-- Assistant Message -->
+            <div class="message assistant-message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Hello! I'm your AI workspace assistant. I can help you organize notes, search through your files, and maintain your knowledge base.</p>
+                        <p>What would you like to work on today?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message user-message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I need to refactor the authentication module and update the API documentation.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant Message with Code -->
+            <div class="message assistant-message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I'll help you with that. Let me analyze your authentication module first.</p>
+                        <div class="code-block">// Example refactored authentication
+const authenticateUser = async (credentials) => {
+    const user = await validateCredentials(credentials);
+    return generateToken(user);
+};</div>
+                        <p>Here's a suggested approach for the refactor. Would you like me to proceed with updating the documentation as well?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message user-message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Yes, please proceed with both the refactoring and documentation updates.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message user-message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Can you show me what files are relevant to the authentication system?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant Message -->
+            <div class="message assistant-message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Perfect! I'll start with the authentication refactoring. I've identified several areas that could be improved:</p>
+                        <p>• Token validation can be optimized<br>• Error handling needs to be more consistent<br>• Documentation should include examples</p>
+                        <p>Would you like me to create a detailed plan before implementation?</p>
+                    </div>
+
+                    <!-- Tool Activity Toggle -->
+                    <button class="tool-toggle" onclick="toggleToolPanel('toolPanel1')">
+                        <span>Tools Used</span>
+                        <span class="tool-badge">3</span>
+                        <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+
+                    <!-- Tool Panel -->
+                    <div class="tool-panel" id="toolPanel1">
+                        <div class="panel-header">
+                            <div class="panel-title">Execution Log</div>
+                        </div>
+
+                        <div class="tool-items">
+                            <!-- Tool 1 -->
+                            <div class="tool-item" id="tool1_1">
+                                <div class="tool-header" onclick="toggleToolItem('tool1_1')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">semantic_search</div>
+                                        <div class="tool-brief">Searched workspace for authentication patterns</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:32</span>
+                                        <span>28 results</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">query</div>
+                                                <div class="arg-value">authentication token validation user session</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 2 -->
+                            <div class="tool-item" id="tool1_2">
+                                <div class="tool-header" onclick="toggleToolItem('tool1_2')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">read_file</div>
+                                        <div class="tool-brief">src/auth/index.ts</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:32</span>
+                                        <span>247 lines</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">filePath</div>
+                                                <div class="arg-value">src/auth/index.ts</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">startLine</div>
+                                                <div class="arg-value">1</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">endLine</div>
+                                                <div class="arg-value">247</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 3 -->
+                            <div class="tool-item" id="tool1_3">
+                                <div class="tool-header" onclick="toggleToolItem('tool1_3')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">read_file</div>
+                                        <div class="tool-brief">src/auth/validators.ts</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:32</span>
+                                        <span>124 lines</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">filePath</div>
+                                                <div class="arg-value">src/auth/validators.ts</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">startLine</div>
+                                                <div class="arg-value">1</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">endLine</div>
+                                                <div class="arg-value">124</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message user-message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Yes, please create a detailed plan with step-by-step implementation.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant Message with long content -->
+            <div class="message assistant-message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Excellent! Here's a comprehensive refactoring plan:</p>
+                        <p><strong>Phase 1: Analysis & Preparation</strong><br>• Review existing authentication flow<br>• Identify dependencies and integration points<br>• Document current behavior and edge cases</p>
+                        <p><strong>Phase 2: Token Validation Improvements</strong><br>• Implement JWT validation with proper error handling<br>• Add token expiration checks<br>• Create token refresh mechanism</p>
+                        <p><strong>Phase 3: Error Handling Standardization</strong><br>• Define consistent error response format<br>• Add specific error codes for different scenarios<br>• Implement proper logging for debugging</p>
+                        <p><strong>Phase 4: Documentation</strong><br>• Add JSDoc comments to all functions<br>• Create usage examples in README<br>• Document API endpoints and expected responses</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Message -->
+            <div class="message user-message">
+                <div class="avatar user">YO</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>Great! Let's start with Phase 1.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant Message with Tools -->
+            <div class="message assistant-message">
+                <div class="avatar assistant">AI</div>
+                <div class="message-content">
+                    <div class="message-text">
+                        <p>I've completed the analysis of your authentication system. I found 5 relevant files and analyzed the token validation logic. Here's what I discovered:</p>
+                        <p>The current implementation has some issues with expired token handling and missing refresh logic. I can help you fix these issues systematically.</p>
+                    </div>
+
+                    <!-- Tool Activity Toggle -->
+                    <button class="tool-toggle" onclick="toggleToolPanel('toolPanel2')">
+                        <span>Tools Used</span>
+                        <span class="tool-badge">5</span>
+                        <svg class="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+
+                    <!-- Tool Panel -->
+                    <div class="tool-panel" id="toolPanel2">
+                        <div class="panel-header">
+                            <div class="panel-title">Execution Log</div>
+                        </div>
+
+                        <div class="tool-items">
+                            <!-- Tool 1 -->
+                            <div class="tool-item" id="tool2_1">
+                                <div class="tool-header" onclick="toggleToolItem('tool2_1')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">file_search</div>
+                                        <div class="tool-brief">src/**/*auth*</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:35</span>
+                                        <span>5 files</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">pattern</div>
+                                                <div class="arg-value">src/**/*auth*</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 2 -->
+                            <div class="tool-item" id="tool2_2">
+                                <div class="tool-header" onclick="toggleToolItem('tool2_2')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">read_file</div>
+                                        <div class="tool-brief">src/auth/token-validator.ts</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:35</span>
+                                        <span>186 lines</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">filePath</div>
+                                                <div class="arg-value">src/auth/token-validator.ts</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">startLine</div>
+                                                <div class="arg-value">1</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">endLine</div>
+                                                <div class="arg-value">186</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 3 -->
+                            <div class="tool-item" id="tool2_3">
+                                <div class="tool-header" onclick="toggleToolItem('tool2_3')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">grep_search</div>
+                                        <div class="tool-brief">Searched for "jwt.verify" patterns</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:36</span>
+                                        <span>12 matches</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">query</div>
+                                                <div class="arg-value">jwt\.verify|token\.validate</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">isRegexp</div>
+                                                <div class="arg-value">true</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">includePattern</div>
+                                                <div class="arg-value">src/**/*.ts</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 4 -->
+                            <div class="tool-item" id="tool2_4">
+                                <div class="tool-header" onclick="toggleToolItem('tool2_4')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">read_file</div>
+                                        <div class="tool-brief">src/auth/middleware.ts</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:36</span>
+                                        <span>94 lines</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">filePath</div>
+                                                <div class="arg-value">src/auth/middleware.ts</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">startLine</div>
+                                                <div class="arg-value">1</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">endLine</div>
+                                                <div class="arg-value">94</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool 5 -->
+                            <div class="tool-item" id="tool2_5">
+                                <div class="tool-header" onclick="toggleToolItem('tool2_5')">
+                                    <div class="tool-indicator"></div>
+                                    <div class="tool-summary">
+                                        <div class="tool-name">list_code_usages</div>
+                                        <div class="tool-brief">validateToken function references</div>
+                                    </div>
+                                    <div class="tool-meta">
+                                        <span class="tool-time">14:36</span>
+                                        <span>8 usages</span>
+                                    </div>
+                                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </div>
+
+                                <div class="tool-details">
+                                    <div class="details-section">
+                                        <div class="details-label">Arguments</div>
+                                        <div class="args-grid">
+                                            <div class="arg-item">
+                                                <div class="arg-key">symbolName</div>
+                                                <div class="arg-value">validateToken</div>
+                                            </div>
+                                            <div class="arg-item">
+                                                <div class="arg-key">filePaths</div>
+                                                <div class="arg-value">["src/auth/token-validator.ts"]</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Container -->
+        <div class="input-container">
+            <!-- Mentioned Files -->
+            <div class="mentioned-files">
+                <div class="file-pill">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                    <span>auth.ts</span>
+                    <div class="file-pill-close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="file-pill">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <path d="M14 2v6h6"/>
+                    </svg>
+                    <span>api-docs.md</span>
+                    <div class="file-pill-close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Wrapper -->
+            <div class="input-wrapper">
+                <button class="attach-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                </button>
+                
+                <textarea 
+                    rows="1" 
+                    placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
+                    id="messageInput"
+                ></textarea>
+                
+                <button class="send-button" id="sendButton">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m22 2-7 20-4-9-9-4Z"/>
+                        <path d="M22 2 11 13"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="helper-text">
+                Pro tip: Use @ to mention files • Shift+Enter for new line
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-resize textarea
+        const textarea = document.getElementById('messageInput');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        // Send message on Enter (without Shift)
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Send button click
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+
+        // File pill close buttons
+        document.querySelectorAll('.file-pill-close').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.file-pill').remove();
+            });
+        });
+
+        // Toggle tool panel
+        function toggleToolPanel(panelId) {
+            const panel = document.getElementById(panelId);
+            const toggle = panel.previousElementSibling;
+            
+            panel.classList.toggle('expanded');
+            toggle.classList.toggle('expanded');
+        }
+
+        // Toggle individual tool item
+        function toggleToolItem(itemId) {
+            const item = document.getElementById(itemId);
+            item.classList.toggle('expanded');
+        }
+
+        function sendMessage() {
+            const text = textarea.value.trim();
+            if (text) {
+                // Add user message to chat
+                const messagesArea = document.getElementById('messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message user-message';
+                messageDiv.innerHTML = `
+                    <div class="avatar user">YO</div>
+                    <div class="message-content">
+                        <div class="message-text">
+                            <p>${text}</p>
+                        </div>
+                    </div>
+                `;
+                messagesArea.appendChild(messageDiv);
+                
+                // Clear input
+                textarea.value = '';
+                textarea.style.height = 'auto';
+                
+                // Scroll to bottom
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+
+                // Show typing indicator
+                setTimeout(() => {
+                    const typingDiv = document.createElement('div');
+                    typingDiv.className = 'message assistant-message';
+                    typingDiv.innerHTML = `
+                        <div class="avatar assistant">AI</div>
+                        <div class="message-content">
+                            <div class="typing-indicator">
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                            </div>
+                        </div>
+                    `;
+                    messagesArea.appendChild(typingDiv);
+                    messagesArea.scrollTop = messagesArea.scrollHeight;
+                }, 500);
+            }
+        }
+    </script>
+</body>
+</html>
