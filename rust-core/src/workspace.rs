@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::fs;
-use sha2::{Sha256, Digest};
 use chrono::Utc;
+use git2::{Repository, Signature, IndexAddOption, Oid};
 
 use crate::models::{Project, FileItem, FileType, VersionMetadata, VersionEntry, VersionHistory};
 
@@ -174,6 +174,9 @@ This file tracks decisions, discussions, and important changes.
         );
         fs::write(project_dir.join(".meta").join("maintenance.md"), maintenance_content)?;
         
+        // Initialize Git repository for version tracking
+        self.init_git_repo(&project_dir)?;
+        
         tracing::info!("Created project: {} ({})", project.name, project.id);
         Ok(())
     }
@@ -291,21 +294,6 @@ This file tracks decisions, discussions, and important changes.
         
         let file_path = self.get_project_dir(&project).join(path);
         
-        // Save version before writing (if file exists and capture is enabled)
-        if capture_version && file_path.exists() {
-            if let Ok(old_content) = fs::read_to_string(&file_path) {
-                // Only save version if content is different
-                if old_content != content {
-                    tracing::info!("Content changed for {}, saving version", path);
-                    let _ = self.save_version(project_id, path, &old_content, None);
-                } else {
-                    tracing::info!("Content unchanged for {}, skipping version", path);
-                }
-            }
-        } else if capture_version {
-            tracing::info!("File {} does not exist yet, no version to save", path);
-        }
-        
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;
@@ -313,151 +301,200 @@ This file tracks decisions, discussions, and important changes.
         
         fs::write(&file_path, content)?;
         tracing::info!("Wrote file: {:?}", file_path);
+        
+        // Auto-commit to Git if capture_version is enabled
+        if capture_version {
+            let commit_message = format!("Update {}", path);
+            if let Err(e) = self.git_commit(project_id, &[path], &commit_message) {
+                tracing::warn!("Failed to auto-commit {}: {}", path, e);
+            }
+        }
+        
         Ok(())
     }
 
-    /// Calculate SHA256 hash of content
-    fn calculate_hash(content: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        format!("{:x}", hasher.finalize())
-    }
+    /// Initialize a Git repository for a project
+    fn init_git_repo(&self, project_dir: &PathBuf) -> anyhow::Result<()> {
+        // Check if already initialized
+        if project_dir.join(".git").exists() {
+            tracing::info!("Git repository already exists in {:?}", project_dir);
+            return Ok(());
+        }
 
-    /// Get version storage directory for a file
-    fn get_version_dir(&self, project_id: &str, file_path: &str) -> PathBuf {
-        // Use base64 encoding to avoid path collisions while keeping it readable
-        use base64::{Engine as _, engine::general_purpose};
-        let encoded = general_purpose::URL_SAFE_NO_PAD.encode(file_path.as_bytes());
+        // Initialize repository
+        let repo = Repository::init(project_dir)?;
+        tracing::info!("Initialized Git repository in {:?}", project_dir);
+
+        // Create initial .gitignore
+        let gitignore_content = "# AgentManager\n.DS_Store\n*.swp\n*.tmp\n";
+        fs::write(project_dir.join(".gitignore"), gitignore_content)?;
+
+        // Make initial commit
+        let mut index = repo.index()?;
+        index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
+        index.write()?;
+
+        let tree_id = index.write_tree()?;
+        let tree = repo.find_tree(tree_id)?;
+
+        let signature = Signature::now("AgentManager", "agent@agentmanager.local")?;
         
-        self.workspace_root
-            .join("projects")
-            .join(project_id)
-            .join(".meta")
-            .join("versions")
-            .join(encoded)
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "Initial commit",
+            &tree,
+            &[],
+        )?;
+
+        tracing::info!("Created initial commit in Git repository");
+        Ok(())
     }
 
-    /// Save a version of a file
-    pub fn save_version(
-        &self,
-        project_id: &str,
-        file_path: &str,
-        content: &str,
-        message: Option<String>,
-    ) -> anyhow::Result<VersionMetadata> {
-        let version_dir = self.get_version_dir(project_id, file_path);
-        fs::create_dir_all(&version_dir)?;
+    /// Get or open Git repository for a project
+    fn get_git_repo(&self, project_id: &str) -> anyhow::Result<Repository> {
+        let project = self.get_project(project_id)?
+            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
+        
+        let project_dir = self.get_project_dir(&project);
+        
+        // Initialize if not exists
+        if !project_dir.join(".git").exists() {
+            self.init_git_repo(&project_dir)?;
+        }
+        
+        Repository::open(&project_dir)
+            .map_err(|e| anyhow::anyhow!("Failed to open Git repository: {}", e))
+    }
 
-        // Load or create version history
-        let history_file = version_dir.join("history.json");
-        let mut history = if history_file.exists() {
-            let content = fs::read_to_string(&history_file)?;
-            serde_json::from_str::<VersionHistory>(&content)?
-        } else {
-            VersionHistory {
-                file_path: file_path.to_string(),
-                current_version: 0,
-                versions: Vec::new(),
+    /// Commit changes to Git
+    fn git_commit(&self, project_id: &str, paths: &[&str], message: &str) -> anyhow::Result<Oid> {
+        let repo = self.get_git_repo(project_id)?;
+        let mut index = repo.index()?;
+
+        // Add specified paths to index
+        for path in paths {
+            index.add_path(std::path::Path::new(path))?;
+        }
+        index.write()?;
+
+        let tree_id = index.write_tree()?;
+        let tree = repo.find_tree(tree_id)?;
+
+        let signature = Signature::now("AgentManager", "agent@agentmanager.local")?;
+        
+        let parent_commit = match repo.head() {
+            Ok(head) => {
+                let oid = head.target().ok_or_else(|| anyhow::anyhow!("No HEAD target"))?;
+                Some(repo.find_commit(oid)?)
             }
+            Err(_) => None,
         };
 
-        // Create new version
-        let new_version = history.current_version + 1;
-        let metadata = VersionMetadata {
-            version: new_version,
-            timestamp: Utc::now(),
-            file_size: content.len() as u64,
-            content_hash: Self::calculate_hash(content),
+        let parent_refs: Vec<&git2::Commit> = if let Some(ref commit) = parent_commit {
+            vec![commit]
+        } else {
+            vec![]
+        };
+
+        let commit_oid = repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
             message,
-        };
+            &tree,
+            &parent_refs,
+        )?;
 
-        // Save version content (preserve original extension or use .dat for unknown)
-        let extension = std::path::Path::new(file_path)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("dat");
-        let version_file = version_dir.join(format!("v{:04}.{}", new_version, extension));
-        fs::write(&version_file, content)?;
-
-        // Update history
-        history.current_version = new_version;
-        history.versions.push(metadata.clone());
-        fs::write(&history_file, serde_json::to_string_pretty(&history)?)?;
-
-        tracing::info!(
-            "Saved version {} for file: {} (project: {})",
-            new_version,
-            file_path,
-            project_id
-        );
-
-        Ok(metadata)
+        tracing::info!("Created Git commit: {} - {}", commit_oid, message);
+        Ok(commit_oid)
     }
 
-    /// List all versions of a file
+    /// List all versions (Git commits) of a file
     pub fn list_versions(&self, project_id: &str, file_path: &str) -> anyhow::Result<VersionHistory> {
-        let version_dir = self.get_version_dir(project_id, file_path);
-        let history_file = version_dir.join("history.json");
+        let repo = self.get_git_repo(project_id)?;
+        let mut revwalk = repo.revwalk()?;
+        revwalk.push_head()?;
 
-        if !history_file.exists() {
-            return Ok(VersionHistory {
-                file_path: file_path.to_string(),
-                current_version: 0,
-                versions: Vec::new(),
-            });
+        let mut versions = Vec::new();
+        let mut version_num = 0;
+
+        for oid in revwalk {
+            let oid = oid?;
+            let commit = repo.find_commit(oid)?;
+            
+            // Check if this commit touches the file
+            let tree = commit.tree()?;
+            if let Ok(_entry) = tree.get_path(std::path::Path::new(file_path)) {
+                version_num += 1;
+                
+                let timestamp = chrono::DateTime::from_timestamp(commit.time().seconds(), 0)
+                    .unwrap_or_else(|| Utc::now());
+
+                // Get file content at this commit to calculate size
+                let entry = tree.get_path(std::path::Path::new(file_path))?;
+                let object = entry.to_object(&repo)?;
+                let blob = object.as_blob().ok_or_else(|| anyhow::anyhow!("Not a blob"))?;
+                let file_size = blob.content().len() as u64;
+
+                versions.push(VersionMetadata {
+                    version: version_num,
+                    timestamp,
+                    file_size,
+                    content_hash: oid.to_string(),
+                    message: commit.message().map(|s| s.to_string()),
+                });
+            }
         }
 
-        let content = fs::read_to_string(&history_file)?;
-        Ok(serde_json::from_str(&content)?)
+        // Reverse to get oldest first
+        versions.reverse();
+        // Re-number from 1
+        for (i, v) in versions.iter_mut().enumerate() {
+            v.version = (i + 1) as u32;
+        }
+
+        Ok(VersionHistory {
+            file_path: file_path.to_string(),
+            current_version: versions.len() as u32,
+            versions,
+        })
     }
 
-    /// Get a specific version of a file
+    /// Get a specific version of a file from Git
     pub fn get_version(&self, project_id: &str, file_path: &str, version: u32) -> anyhow::Result<VersionEntry> {
-        let version_dir = self.get_version_dir(project_id, file_path);
-        
-        // Get the extension from the original file path
-        let extension = std::path::Path::new(file_path)
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("dat");
-        let version_file = version_dir.join(format!("v{:04}.{}", version, extension));
-
-        if !version_file.exists() {
-            return Err(anyhow::anyhow!("Version {} not found", version));
-        }
-
-        let content = fs::read_to_string(&version_file)?;
-
-        // Get metadata from history
         let history = self.list_versions(project_id, file_path)?;
+        
         let metadata = history
             .versions
-            .iter()
-            .find(|v| v.version == version)
-            .ok_or_else(|| anyhow::anyhow!("Version metadata not found"))?
+            .get((version - 1) as usize)
+            .ok_or_else(|| anyhow::anyhow!("Version {} not found", version))?
             .clone();
+
+        let repo = self.get_git_repo(project_id)?;
+        let oid = Oid::from_str(&metadata.content_hash)?;
+        let commit = repo.find_commit(oid)?;
+        let tree = commit.tree()?;
+        let entry = tree.get_path(std::path::Path::new(file_path))?;
+        let object = entry.to_object(&repo)?;
+        let blob = object.as_blob().ok_or_else(|| anyhow::anyhow!("Not a blob"))?;
+        let content = String::from_utf8_lossy(blob.content()).to_string();
 
         Ok(VersionEntry { metadata, content })
     }
 
-    /// Restore a specific version of a file
+    /// Restore a specific version of a file from Git
     pub fn restore_version(&self, project_id: &str, file_path: &str, version: u32) -> anyhow::Result<()> {
-        // Get the version content
+        // Get the version content from Git
         let version_entry = self.get_version(project_id, file_path, version)?;
 
-        // Save current version before restoring
-        let project = self.get_project(project_id)?
-            .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
-        let current_file_path = self.get_project_dir(&project).join(file_path);
-
-        if current_file_path.exists() {
-            let current_content = fs::read_to_string(&current_file_path)?;
-            let message = format!("Before restoring to version {}", version);
-            let _ = self.save_version(project_id, file_path, &current_content, Some(message));
-        }
-
-        // Restore the version without triggering version capture again
+        // Write the content (this will auto-commit)
         self.write_file_internal(project_id, file_path, &version_entry.content, false)?;
+        
+        // Make a commit noting the restoration
+        let message = format!("Restore {} to version {}", file_path, version);
+        self.git_commit(project_id, &[file_path], &message)?;
 
         tracing::info!(
             "Restored file {} to version {} (project: {})",
@@ -469,7 +506,7 @@ This file tracks decisions, discussions, and important changes.
         Ok(())
     }
 
-    /// Delete a file (with version tracking)
+    /// Delete a file (with Git tracking)
     pub fn delete_file(&self, project_id: &str, file_path: &str) -> anyhow::Result<()> {
         let project = self.get_project(project_id)?
             .ok_or_else(|| anyhow::anyhow!("Project not found"))?;
@@ -484,17 +521,17 @@ This file tracks decisions, discussions, and important changes.
             return Err(anyhow::anyhow!("Path is a directory, not a file: {}", file_path));
         }
         
-        // Save version before deleting
-        if let Ok(content) = fs::read_to_string(&full_path) {
-            let message = format!("File deleted at {}", Utc::now().format("%Y-%m-%d %H:%M:%S"));
-            let _ = self.save_version(project_id, file_path, &content, Some(message));
-        }
-        
         // Delete the file
         fs::remove_file(&full_path)?;
         
+        // Commit the deletion to Git
+        let message = format!("Delete {}", file_path);
+        if let Err(e) = self.git_commit(project_id, &[file_path], &message) {
+            tracing::warn!("Failed to commit deletion of {}: {}", file_path, e);
+        }
+        
         tracing::info!(
-            "Deleted file {} (project: {}), version saved",
+            "Deleted file {} (project: {}), committed to Git",
             file_path,
             project_id
         );

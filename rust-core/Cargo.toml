@@ -24,8 +24,7 @@ anyhow = "1"
 directories = "5"
 dirs = "5"
 async-stream = "0.3"
-sha2 = "0.10"
-base64 = "0.22"
+git2 = "0.20"
 
 [profile.release]
 opt-level = 3
