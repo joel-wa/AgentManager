@@ -1002,6 +1002,10 @@ class ToolExecutor:
             resolved_args['_rust_core_url'] = self._rust_core_url
             resolved_args['_working_directory'] = self._working_directory
         
+        # Inject working directory for search tool
+        if tool_name == 'search' and self._working_directory:
+            resolved_args['_working_directory'] = self._working_directory
+        
         try:
             result = await tool.execute(resolved_args)
             result.execution_time_ms = (time.time() - start_time) * 1000
