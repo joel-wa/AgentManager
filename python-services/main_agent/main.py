@@ -18,6 +18,7 @@ import httpx
 import subprocess
 
 from ollama_client import OllamaClient
+from copilot_client import CopilotClient
 from tool_logic import ToolExecutor
 
 # Auto-commit function for version tracking
@@ -73,9 +74,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize clients
-ollama_client = OllamaClient(model="glm-4.6:cloud")
-# OllamaClient(model="qwen3-vl:235b-cloud")
+# Initialize clients based on AI_PROVIDER environment variable
+# ai_provider = os.getenv("AI_PROVIDER", "ollama").lower()
+ai_provider = os.getenv("AI_PROVIDER", "copilot").lower()
+
+if ai_provider == "copilot":
+    print("[MAIN AGENT] Using GitHub Copilot CLI as AI provider")
+    ai_client = CopilotClient()
+else:
+    print(f"[MAIN AGENT] Using Ollama as AI provider (model: glm-4.6:cloud)")
+    ai_client = OllamaClient(model="glm-4.6:cloud")
+    # OllamaClient(model="qwen3-vl:235b-cloud")
+
 tool_executor = ToolExecutor()
 
 
@@ -117,11 +127,15 @@ class HealthResponse(BaseModel):
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Check service health and model availability"""
-    model_available = await ollama_client.check_model()
+    model_available = await ai_client.check_model()
+    
+    # Provide appropriate URL based on provider
+    provider_url = getattr(ai_client, 'base_url', 'github-copilot-cli')
+    
     return HealthResponse(
         status="healthy" if model_available else "degraded",
         model_available=model_available,
-        ollama_url=ollama_client.base_url
+        ollama_url=provider_url
     )
 
 
@@ -222,8 +236,8 @@ async def chat(request: ChatRequest):
         for iteration in range(max_iterations):
             print(f"\n[ITERATION {iteration + 1}] Calling LLM...")
             
-            # Get response from Ollama
-            response_text, tool_calls = await ollama_client.chat(messages, request.tools)
+            # Get response from configured AI provider (Ollama or Copilot)
+            response_text, tool_calls = await ai_client.chat(messages, request.tools)
             final_response = response_text
             
             print(f"[ITERATION {iteration + 1}] Response length: {len(response_text)} chars")
@@ -277,7 +291,7 @@ async def chat(request: ChatRequest):
                     
                     # Force one final response from agent
                     print(f"[ITERATION {iteration + 1}] Forcing final response due to stuck state...")
-                    response_text, _ = await ollama_client.chat(messages, [])  # No tools allowed
+                    response_text, _ = await ai_client.chat(messages, [])  # No tools allowed
                     final_response = response_text
                     break
             else:
@@ -425,8 +439,8 @@ async def chat_stream(request: ChatRequest):
                 # Send iteration status
                 yield f"data: {json.dumps({'type': 'iteration', 'number': iteration + 1})}\n\n"
                 
-                # Get response from Ollama
-                response_text, tool_calls = await ollama_client.chat(messages, request.tools)
+                # Get response from configured AI provider
+                response_text, tool_calls = await ai_client.chat(messages, request.tools)
                 final_response = response_text
                 
                 # If no tool calls, send final response and finish
@@ -474,7 +488,7 @@ async def chat_stream(request: ChatRequest):
 async def complete(prompt: str):
     """Simple completion without tool usage"""
     try:
-        response = await ollama_client.complete(prompt)
+        response = await ai_client.complete(prompt)
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
