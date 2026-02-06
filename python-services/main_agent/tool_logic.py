@@ -116,16 +116,83 @@ class SearchTool(BaseTool):
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         query = args.get("query", "")
         max_results = args.get("max_results", 10)
-        # Delegated to Rust core via vector DB
-        return ToolResult(
-            success=True,
-            result={
-                "query": query,
-                "max_results": max_results,
-                "matches": [],
-                "status": "delegated_to_core"
-            }
-        )
+        working_directory = args.get("_working_directory", ".")
+        
+        if not query:
+            return ToolResult(
+                success=False,
+                result=None,
+                error="No search query provided"
+            )
+        
+        try:
+            matches = []
+            query_lower = query.lower()
+            
+            # Directories to ignore
+            ignore_dirs = {'.git', '__pycache__', 'node_modules', 'target', 'dist', 
+                          'build', '.venv', 'venv', '.cache', '.pytest_cache'}
+            
+            # File extensions to search (text files only)
+            text_extensions = {'.py', '.js', '.ts', '.tsx', '.jsx', '.md', '.txt', 
+                             '.json', '.yaml', '.yml', '.toml', '.rs', '.go', 
+                             '.java', '.cpp', '.c', '.h', '.hpp', '.html', '.css',
+                             '.sql', '.sh', '.bat', '.ps1', '.xml', '.ini', '.conf'}
+            
+            # Walk through directory
+            for root, dirs, files in os.walk(working_directory):
+                # Remove ignored directories from search
+                dirs[:] = [d for d in dirs if d not in ignore_dirs]
+                
+                # Check if we have enough results
+                if len(matches) >= max_results:
+                    break
+                
+                for filename in files:
+                    if len(matches) >= max_results:
+                        break
+                    
+                    # Check file extension
+                    _, ext = os.path.splitext(filename)
+                    if ext not in text_extensions:
+                        continue
+                    
+                    filepath = os.path.join(root, filename)
+                    rel_path = os.path.relpath(filepath, working_directory)
+                    
+                    try:
+                        # Read file and search for query
+                        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                            for line_num, line in enumerate(f, 1):
+                                if query_lower in line.lower():
+                                    matches.append({
+                                        "file": rel_path,
+                                        "line": line_num,
+                                        "content": line.strip()[:200],  # Limit line length
+                                        "relevance": 1.0  # Simple grep doesn't score relevance
+                                    })
+                                    
+                                    if len(matches) >= max_results:
+                                        break
+                    except (PermissionError, UnicodeDecodeError, IsADirectoryError):
+                        # Skip files we can't read
+                        continue
+            
+            return ToolResult(
+                success=True,
+                result={
+                    "query": query,
+                    "max_results": max_results,
+                    "matches": matches,
+                    "total_found": len(matches)
+                }
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Search failed: {str(e)}"
+            )
 
 
 class ReadFileTool(BaseTool):

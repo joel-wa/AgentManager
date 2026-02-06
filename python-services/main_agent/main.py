@@ -75,8 +75,8 @@ app.add_middleware(
 )
 
 # Initialize clients based on AI_PROVIDER environment variable
-# ai_provider = os.getenv("AI_PROVIDER", "ollama").lower()
-ai_provider = os.getenv("AI_PROVIDER", "copilot").lower()
+ai_provider = os.getenv("AI_PROVIDER", "ollama").lower()
+# ai_provider = os.getenv("AI_PROVIDER", "copilot").lower()
 
 if ai_provider == "copilot":
     print("[MAIN AGENT] Using GitHub Copilot CLI as AI provider")
