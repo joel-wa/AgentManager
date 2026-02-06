@@ -21,74 +21,91 @@ class CopilotClient:
         self.timeout = 120.0
         self.response_buffer = []
         
-    async def _ensure_session(self) -> bool:
-        """Ensure Copilot CLI session is active, start if needed"""
-        async with self.lock:
-            if self.process is not None and self.process.poll() is None:
-                return True
+        # Detect copilot command - could be executable or PowerShell script
+        self.copilot_cmd = self._detect_copilot_command()
+        
+    def _detect_copilot_command(self) -> List[str]:
+        """Detect how to run copilot command on this system"""
+        # Try direct executable first
+        try:
+            result = subprocess.run(
+                ["copilot", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                shell=False
+            )
+            if result.returncode == 0:
+                return ["copilot"]
+        except FileNotFoundError:
+            pass
+        
+        # On Windows, try PowerShell script
+        if os.name == 'nt':
+            # Try common npm global install location
+            npm_script = os.path.expanduser(r"~\AppData\Roaming\npm\copilot.ps1")
+            if os.path.exists(npm_script):
+                return ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", npm_script]
             
-            # Check if gh copilot is available
+            # Try finding via PowerShell Get-Command
             try:
-                check_result = subprocess.run(
-                    ["gh", "copilot", "--version"],
+                result = subprocess.run(
+                    ["powershell.exe", "-NoProfile", "-Command", 
+                     "(Get-Command copilot -ErrorAction SilentlyContinue).Source"],
                     capture_output=True,
                     text=True,
                     timeout=5
                 )
-                if check_result.returncode != 0:
-                    print("[COPILOT] GitHub Copilot CLI not available")
-                    return False
-            except Exception as e:
-                print(f"[COPILOT] Error checking Copilot availability: {e}")
-                return False
-            
-            # Start interactive Copilot session
-            try:
-                # Use gh copilot suggest with interactive mode
-                self.process = subprocess.Popen(
-                    ["gh", "copilot", "suggest", "-t", "shell"],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-                )
-                
-                self.session_active = True
-                print("[COPILOT] Started persistent Copilot CLI session")
-                return True
-                
-            except Exception as e:
-                print(f"[COPILOT] Failed to start Copilot session: {e}")
-                self.session_active = False
-                return False
+                if result.returncode == 0 and result.stdout.strip():
+                    script_path = result.stdout.strip()
+                    if script_path.endswith('.ps1'):
+                        return ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script_path]
+            except Exception:
+                pass
+        
+        # Default fallback
+        return ["copilot"]
+        
+    async def _ensure_session(self) -> bool:
+        """Ensure Copilot CLI is available (no persistent session needed for programmatic mode)"""
+        try:
+            cmd = self.copilot_cmd + ["--version"]
+            check_result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                shell=(os.name == 'nt' and len(self.copilot_cmd) == 1)
+            )
+            return check_result.returncode == 0
+        except FileNotFoundError:
+            print(f"[COPILOT] Copilot command not found: {self.copilot_cmd}")
+            return False
+        except Exception as e:
+            print(f"[COPILOT] Error checking Copilot availability: {e}")
+            return False
     
     async def check_model(self) -> bool:
-        """Check if Copilot CLI is available and authenticated"""
+        """Check if Copilot CLI is available"""
         try:
-            # Check auth status
+            # Check Copilot availability using --version
+            cmd = self.copilot_cmd + ["--version"]
             result = subprocess.run(
-                ["gh", "auth", "status"],
+                cmd,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                shell=(os.name == 'nt' and len(self.copilot_cmd) == 1)
             )
             
-            if result.returncode != 0:
-                print("[COPILOT] Not authenticated with GitHub")
-                return False
+            is_available = result.returncode == 0
+            if is_available:
+                print(f"[COPILOT] Successfully detected Copilot CLI using: {' '.join(self.copilot_cmd[:2])}")
+            return is_available
             
-            # Check Copilot availability
-            result = subprocess.run(
-                ["gh", "copilot", "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            
-            return result.returncode == 0
-            
+        except FileNotFoundError:
+            print(f"[COPILOT] Command not found: {self.copilot_cmd}")
+            return False
         except Exception as e:
             print(f"[COPILOT] Health check failed: {e}")
             return False
@@ -106,13 +123,15 @@ class CopilotClient:
             # Build prompt from messages
             prompt = self._messages_to_prompt(messages, tools)
             
-            # Use gh copilot suggest for each query (stateless approach)
-            # This is more reliable than trying to maintain interactive session
+            # Use copilot with -p (programmatic mode) for each query
+            cmd = self.copilot_cmd + ["-p", prompt]
+            
             result = subprocess.run(
-                ["gh", "copilot", "suggest", prompt],
+                cmd,
                 capture_output=True,
                 text=True,
-                timeout=self.timeout
+                timeout=self.timeout,
+                shell=(os.name == 'nt' and len(self.copilot_cmd) == 1)
             )
             
             if result.returncode == 0:
@@ -133,7 +152,7 @@ class CopilotClient:
         except subprocess.TimeoutExpired:
             return "Error: Request timed out. Copilot CLI took too long to respond.", None
         except FileNotFoundError:
-            return "Error: GitHub Copilot CLI (gh copilot) not found. Please install it with 'gh extension install github/gh-copilot'", None
+            return f"Error: GitHub Copilot CLI command not found: {' '.join(self.copilot_cmd)}", None
         except Exception as e:
             print(f"[COPILOT] Exception: {e}")
             return f"Error: {str(e)}", None
@@ -141,11 +160,13 @@ class CopilotClient:
     async def complete(self, prompt: str) -> str:
         """Simple text completion"""
         try:
+            cmd = self.copilot_cmd + ["-p", prompt]
             result = subprocess.run(
-                ["gh", "copilot", "suggest", prompt],
+                cmd,
                 capture_output=True,
                 text=True,
-                timeout=self.timeout
+                timeout=self.timeout,
+                shell=(os.name == 'nt' and len(self.copilot_cmd) == 1)
             )
             
             if result.returncode == 0:

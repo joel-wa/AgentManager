@@ -8,29 +8,16 @@ The Copilot provider wraps the GitHub Copilot CLI (`gh copilot`) as an HTTP-acce
 
 ## Prerequisites
 
-1. **GitHub CLI (gh)** - Install from https://cli.github.com/
+1. **GitHub Copilot CLI** - The standalone copilot command
    ```bash
-   # Windows (winget)
-   winget install GitHub.cli
-   
-   # macOS
-   brew install gh
-   
-   # Linux
-   # See https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+   # Check if installed
+   copilot --version
    ```
+   
+   If not installed, follow instructions at: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
 
-2. **GitHub Copilot CLI Extension**
-   ```bash
-   gh extension install github/gh-copilot
-   ```
-
-3. **GitHub Authentication**
-   ```bash
-   gh auth login
-   ```
-   
-   You must be authenticated with a GitHub account that has Copilot access.
+2. **GitHub Authentication**
+   The copilot CLI will prompt for authentication on first use.
 
 ## Configuration
 
@@ -92,7 +79,7 @@ export AI_PROVIDER=ollama
               ▼
 ┌─────────────────────────────────────────┐
 │   GitHub Copilot CLI (subprocess)       │
-│   gh copilot suggest                    │
+│   copilot -p "<prompt>"                 │
 └─────────────────────────────────────────┘
 ```
 
@@ -102,7 +89,7 @@ export AI_PROVIDER=ollama
 2. **Provider Selection**: Main agent checks `AI_PROVIDER` environment variable
 3. **Copilot Client**: 
    - Converts chat messages to a Copilot-compatible prompt
-   - Executes `gh copilot suggest` command with the prompt
+   - Executes `copilot -p "<prompt>"` command (programmatic mode)
    - Parses the response and extracts any tool calls
 4. **Tool Execution**: If Copilot suggests commands, they're mapped to tools:
    - `cat file.txt` → `read_file` tool
@@ -192,17 +179,18 @@ Once configured, the entire AgentManager system will use Copilot:
 
 ### "GitHub Copilot CLI not found"
 
-**Solution:** Install the gh copilot extension:
-```bash
-gh extension install github/gh-copilot
-```
+**Solution:** Install the standalone GitHub Copilot CLI:
+- Visit: https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
+- Ensure `copilot` command is in your PATH
+- Test with: `copilot --version`
 
 ### "Not authenticated with GitHub"
 
-**Solution:** Authenticate with gh:
+**Solution:** Run copilot once to authenticate:
 ```bash
-gh auth login
+copilot -p "test prompt"
 ```
+It will prompt you to authenticate on first use.
 
 ### "Error: Copilot returned error"
 
@@ -213,17 +201,16 @@ gh auth login
 
 **Check Copilot status:**
 ```bash
-gh copilot --version
-gh copilot suggest "test prompt"
+copilot --version
+copilot -p "test prompt"
 ```
 
 ### Health check shows "degraded"
 
 The main agent is running but Copilot CLI is not available. Check:
-1. Is `gh` installed? (`gh --version`)
-2. Is copilot extension installed? (`gh extension list`)
-3. Are you authenticated? (`gh auth status`)
-4. Do you have Copilot access? Try running `gh copilot suggest "hello"`
+1. Is `copilot` installed? (`copilot --version`)
+2. Is `copilot` in your PATH?
+3. Are you authenticated? Try running `copilot -p "hello"`
 
 ## Development Notes
 

@@ -7,20 +7,14 @@ Get up and running with GitHub Copilot as your AI provider in 5 minutes.
 Run these commands to verify you have everything:
 
 ```powershell
-# Check GitHub CLI
-gh --version
+# Check Copilot CLI
+copilot --version
 
-# Check Copilot extension
-gh extension list | Select-String copilot
-
-# Check authentication
-gh auth status
-
-# Test Copilot
-gh copilot suggest "list files in current directory"
+# Test Copilot with a simple prompt
+copilot -p "list files in current directory"
 ```
 
-If any of these fail, see the [installation section](#installation).
+If the `copilot` command is not found, see the [installation section](#installation).
 
 ## Quick Start (Already Set Up)
 
@@ -58,49 +52,20 @@ That's it! The agent is now using GitHub Copilot CLI.
 
 ## Installation (If Needed)
 
-### 1. Install GitHub CLI
+### Install GitHub Copilot CLI
 
-**Windows:**
-```powershell
-winget install GitHub.cli
-```
+Follow the official installation guide:
+https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
 
-**macOS:**
-```bash
-brew install gh
-```
+The `copilot` command should be added to your PATH automatically.
 
-**Linux (Debian/Ubuntu):**
-```bash
-type -p curl >/dev/null || sudo apt install curl -y
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-sudo apt update
-sudo apt install gh -y
-```
-
-### 2. Install Copilot Extension
+### Verify Installation
 
 ```bash
-gh extension install github/gh-copilot
+copilot --version
 ```
 
-### 3. Authenticate
-
-```bash
-gh auth login
-```
-
-Follow the prompts to authenticate with your GitHub account that has Copilot access.
-
-### 4. Verify Installation
-
-```bash
-gh copilot suggest "echo hello world"
-```
-
-You should see Copilot's suggestion. If you get an error about not having access, you need a GitHub Copilot subscription.
+On first use, Copilot will prompt you to authenticate with GitHub.
 
 ## Using with Full Application
 
@@ -190,23 +155,21 @@ No code changes needed—just restart the main agent service.
 
 ## Troubleshooting
 
-### "Command 'gh' not found"
+### "Command 'copilot' not found"
 
-**Solution:** Install GitHub CLI (see [Installation](#installation))
+**Solution:** Install GitHub Copilot CLI:
+https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line
 
-### "Extension not found"
-
-**Solution:** Install Copilot extension:
-```bash
-gh extension install github/gh-copilot
-```
+Ensure it's in your PATH.
 
 ### "Not authenticated"
 
-**Solution:** Login with gh:
+**Solution:** Run copilot once to authenticate:
 ```bash
-gh auth login
+copilot -p "test"
 ```
+
+It will open a browser for GitHub authentication.
 
 ### "You don't have access to GitHub Copilot"
 
@@ -216,10 +179,8 @@ gh auth login
 
 Check each prerequisite:
 ```bash
-gh --version                          # Should show version
-gh extension list                     # Should show gh-copilot
-gh auth status                        # Should show logged in
-gh copilot suggest "test"            # Should return suggestion
+copilot --version                         # Should show version
+copilot -p "test"                         # Should return suggestion or prompt to auth
 ```
 
 ### Copilot seems slow
