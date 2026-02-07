@@ -7,6 +7,7 @@ import { TopBar } from './components/TopBar'
 import { NewProjectModal } from './components/NewProjectModal'
 import { FileViewer } from './components/FileViewer'
 import { SettingsModal } from './components/SettingsModal'
+import { SearchModal } from './components/SearchModal'
 import type { ChatTab } from './components/ChatTabs'
 import { api } from './services/api'
 import { 
@@ -90,6 +91,7 @@ function App() {
   const [showSidePanel, setShowSidePanel] = useState(true)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showSearchModal, setShowSearchModal] = useState(false)
   const [workspaceHealth, setWorkspaceHealth] = useState<'good' | 'warning' | 'critical'>('good')
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessingSuggestion, setIsProcessingSuggestion] = useState(false)
@@ -110,6 +112,20 @@ function App() {
   useEffect(() => {
     checkHealth()
     loadProjects()
+  }, [])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+P or Cmd+P for search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault()
+        setShowSearchModal(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   // Initialize first tab when project is set
@@ -851,6 +867,15 @@ function App() {
       {showSettingsModal && (
         <SettingsModal
           onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {showSearchModal && (
+        <SearchModal
+          isOpen={showSearchModal}
+          onClose={() => setShowSearchModal(false)}
+          availableFiles={availableFiles}
+          onFileSelect={handleFileLinkClick}
         />
       )}
     </div>
