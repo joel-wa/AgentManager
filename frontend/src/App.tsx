@@ -9,6 +9,7 @@ import { NewProjectModal } from './components/NewProjectModal'
 import { FileViewer } from './components/FileViewer'
 import { SettingsModal } from './components/SettingsModal'
 import { SearchModal } from './components/SearchModal'
+import { ToolExecutionModal } from './components/ToolExecutionModal'
 import type { ChatTab } from './components/ChatTabs'
 import { api } from './services/api'
 import { 
@@ -94,6 +95,7 @@ function App() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showSearchModal, setShowSearchModal] = useState(false)
+  const [showToolExecutionModal, setShowToolExecutionModal] = useState(false)
   const [workspaceHealth, setWorkspaceHealth] = useState<'good' | 'warning' | 'critical'>('good')
   const [isLoading, setIsLoading] = useState(false)
   const [isProcessingSuggestion, setIsProcessingSuggestion] = useState(false)
@@ -123,6 +125,11 @@ function App() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault()
         setShowSearchModal(true)
+      }
+      // Ctrl+Shift+T or Cmd+Shift+T for tool execution
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault()
+        setShowToolExecutionModal(true)
       }
     }
 
@@ -774,6 +781,7 @@ function App() {
             projectId={currentProject?.id}
             onVersionRestore={handleVersionRestore}
             onFileOpen={handleFileLinkClick}
+            onOpenToolExecution={() => setShowToolExecutionModal(true)}
           />
         </div>
         
@@ -884,6 +892,14 @@ function App() {
           onClose={() => setShowSearchModal(false)}
           availableFiles={availableFiles}
           onFileSelect={handleFileLinkClick}
+        />
+      )}
+
+      {showToolExecutionModal && (
+        <ToolExecutionModal
+          isOpen={showToolExecutionModal}
+          onClose={() => setShowToolExecutionModal(false)}
+          projectId={currentProject?.id}
         />
       )}
     </div>

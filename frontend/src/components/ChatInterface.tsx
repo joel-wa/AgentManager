@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, ChevronDown, FileText, X, MessageSquare } from 'lucide-react'
+import { Send, Paperclip, ChevronDown, FileText, X, MessageSquare, Wrench } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -15,6 +15,7 @@ type Props = {
   projectId?: string
   onVersionRestore?: (filePath: string, version: number) => void
   onFileOpen?: (filePath: string) => void
+  onOpenToolExecution?: () => void
 }
 
 export function ChatInterface({ 
@@ -24,7 +25,8 @@ export function ChatInterface({
   availableFiles = [], 
   projectId,
   onVersionRestore,
-  onFileOpen
+  onFileOpen,
+  onOpenToolExecution
 }: Props) {
   const [input, setInput] = useState('')
   const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
@@ -321,6 +323,16 @@ export function ChatInterface({
               title="Attach file"
             >
               <Paperclip className="w-[18px] h-[18px]" />
+            </button>
+            
+            <button
+              type="button"
+              onClick={onOpenToolExecution}
+              className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white/90 
+                hover:bg-white/8 rounded-lg transition-all flex-shrink-0"
+              title="Execute tool manually (Ctrl+Shift+T)"
+            >
+              <Wrench className="w-[18px] h-[18px]" />
             </button>
             
             <div className="flex-1 relative">
