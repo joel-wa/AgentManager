@@ -360,13 +360,21 @@ async fn notify_file_change(
     Ok(())
 }
 
-/// Get project timeline
+/// Get project timeline from git commit history
 pub async fn get_timeline(
-    State(_state): State<Arc<RwLock<AppState>>>,
-    Path(_id): Path<String>,
-) -> Json<Vec<TimelineEntry>> {
-    // Return empty timeline - real entries come from maintenance agent
-    Json(vec![])
+    State(state): State<Arc<RwLock<AppState>>>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<TimelineEntry>>, StatusCode> {
+    let state = state.read().await;
+    
+    match state.workspace.get_commit_timeline(&id, 50) {
+        Ok(entries) => Ok(Json(entries)),
+        Err(e) => {
+            tracing::error!("Failed to get commit timeline: {}", e);
+            // Return empty timeline on error instead of failing
+            Ok(Json(vec![]))
+        }
+    }
 }
 
 /// Get maintenance suggestions

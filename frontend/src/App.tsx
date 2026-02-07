@@ -462,7 +462,7 @@ function App() {
         },
         // onComplete - final response received
         (response) => {
-          // Extract file changes from tool activity
+          // Extract file changes from tool activity for inline display
           const fileChanges = (response.tool_calls || [])
             .filter(tc => tc.name === 'write_file' || tc.name === 'WriteFileTool')
             .map(tc => {
@@ -491,15 +491,9 @@ function App() {
             m.id === assistantMessageId ? finalMessage : m
           ))
           
-          // Add to timeline if there are file changes
-          if (fileChanges.length > 0) {
-            const newEntry: TimelineEntry = {
-              id: `timeline-${Date.now()}`,
-              timestamp: new Date(),
-              title: `AI Response: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-              files: fileChanges.map(fc => ({ action: fc.action, path: fc.path }))
-            }
-            setTimeline(prev => [newEntry, ...prev])
+          // Reload timeline from git commits instead of manually tracking
+          if (fileChanges.length > 0 && currentProject) {
+            loadTimeline()
           }
           
           // Check if we should trigger a summary (every 10 messages)
