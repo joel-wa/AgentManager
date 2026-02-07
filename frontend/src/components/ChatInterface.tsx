@@ -13,6 +13,7 @@ type Props = {
   availableFiles?: string[]
   projectId?: string
   onVersionRestore?: (filePath: string, version: number) => void
+  onFileOpen?: (filePath: string) => void
 }
 
 export function ChatInterface({ 
@@ -21,7 +22,8 @@ export function ChatInterface({
   isLoading = false, 
   availableFiles = [], 
   projectId,
-  onVersionRestore 
+  onVersionRestore,
+  onFileOpen
 }: Props) {
   const [input, setInput] = useState('')
   const [mentionedFiles, setMentionedFiles] = useState<string[]>([])
@@ -160,6 +162,7 @@ export function ChatInterface({
             message={message} 
             projectId={projectId}
             onVersionRestore={onVersionRestore}
+            onFileOpen={onFileOpen}
           />
         ))}
         
@@ -276,15 +279,27 @@ export function ChatInterface({
 function MessageBubble({ 
   message, 
   projectId, 
-  onVersionRestore 
+  onVersionRestore,
+  onFileOpen
 }: { 
   message: Message
   projectId?: string
   onVersionRestore?: (filePath: string, version: number) => void
+  onFileOpen?: (filePath: string) => void
 }) {
   const [showToolActivity, setShowToolActivity] = useState(false)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
   const isUser = message.role === 'user'
+  
+  const handleLinkClick = (href: string, e: React.MouseEvent) => {
+    // Check if it looks like a file path
+    if (href && !href.startsWith('http') && !href.startsWith('mailto:')) {
+      e.preventDefault()
+      if (onFileOpen) {
+        onFileOpen(href)
+      }
+    }
+  }
   
   const getToolIcon = () => {
     return <div className="w-2 h-2 rounded-full bg-white/30 flex-shrink-0" />
@@ -322,6 +337,16 @@ function MessageBubble({
                   rehypePlugins={[rehypeHighlight]}
                   components={{
                     p: ({node, ...props}) => <p className="mb-3 last:mb-0" {...props} />,
+                    a: ({node, href, children, ...props}) => (
+                      <a
+                        href={href}
+                        onClick={(e) => handleLinkClick(href || '', e)}
+                        className="text-blue-400 hover:text-blue-300 underline cursor-pointer transition-colors"
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    ),
                     code: ({node, className, children, ...props}) => {
                       const match = /language-(\w+)/.exec(className || '')
                       const isInline = !match

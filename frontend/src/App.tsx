@@ -646,6 +646,7 @@ function App() {
     
     setFileLoading(true)
     setSidePanel('file-viewer') // Switch to file viewer panel
+    setShowSidePanel(true) // Ensure side panel is visible
     try {
       const content = await api.getFileContent(currentProject?.id || '1', fullPath)
       setViewingFile({
@@ -660,6 +661,29 @@ function App() {
         name: file.name,
         content: `# ${file.name}\n\nFile content would be loaded from the workspace.\n\nPath: ${fullPath}`
       })
+    } finally {
+      setFileLoading(false)
+    }
+  }
+
+  const handleFileLinkClick = async (filePath: string) => {
+    if (!currentProject) return
+    
+    setFileLoading(true)
+    setSidePanel('file-viewer')
+    setShowSidePanel(true)
+    
+    try {
+      const content = await api.getFileContent(currentProject.id, filePath)
+      const fileName = filePath.split('/').pop() || filePath
+      setViewingFile({
+        path: filePath,
+        name: fileName,
+        content
+      })
+    } catch (error) {
+      // Fail silently as per requirement - just log to console
+      console.log('Could not open file:', filePath, error)
     } finally {
       setFileLoading(false)
     }
@@ -730,6 +754,7 @@ function App() {
             availableFiles={availableFiles}
             projectId={currentProject?.id}
             onVersionRestore={handleVersionRestore}
+            onFileOpen={handleFileLinkClick}
           />
         </div>
         
