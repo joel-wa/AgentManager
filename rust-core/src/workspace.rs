@@ -589,9 +589,14 @@ This file tracks decisions, discussions, and important changes.
             let commit = repo.find_commit(oid)?;
             
             // Get commit metadata
-            let timestamp = chrono::DateTime::from_timestamp(commit.time().seconds(), 0)
-                .unwrap_or_else(|| Utc::now());
-            let message = commit.message().unwrap_or("Update").to_string();
+            let timestamp = match chrono::DateTime::from_timestamp(commit.time().seconds(), 0) {
+                Some(ts) => ts,
+                None => {
+                    tracing::warn!("Invalid timestamp for commit {}, skipping", oid);
+                    continue;
+                }
+            };
+            let message = commit.message().unwrap_or("(no commit message)").to_string();
             
             // Get list of files changed in this commit
             let mut files = Vec::new();
@@ -609,9 +614,13 @@ This file tracks decisions, discussions, and important changes.
                 
                 diff.foreach(
                     &mut |delta, _progress| {
-                        let file_path = delta.new_file().path()
-                            .and_then(|p| p.to_str())
-                            .unwrap_or("unknown");
+                        let file_path = match delta.new_file().path().and_then(|p| p.to_str()) {
+                            Some(path) => path,
+                            None => {
+                                tracing::warn!("Invalid UTF-8 file path in commit {}", oid);
+                                return true; // Skip this file
+                            }
+                        };
                         
                         let action = match delta.status() {
                             git2::Delta::Added => "created",
@@ -662,7 +671,7 @@ This file tracks decisions, discussions, and important changes.
                 entries.push(TimelineEntry {
                     id: oid.to_string(),
                     timestamp,
-                    title: message.lines().next().unwrap_or("Update").to_string(),
+                    title: message.lines().next().unwrap_or("(no commit message)").to_string(),
                     files,
                 });
                 count += 1;
