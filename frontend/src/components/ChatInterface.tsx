@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, ChevronDown, FileText, X } from 'lucide-react'
+import { Send, Paperclip, ChevronDown, FileText, X, MessageSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import type { Message } from '../App'
 import { FileChangesList } from './FileChangesList'
+import { api } from '../services/api'
 
 type Props = {
   messages: Message[]
@@ -31,13 +32,39 @@ export function ChatInterface({
   const [mentionFilter, setMentionFilter] = useState('')
   const [mentionPosition, setMentionPosition] = useState(0)
   const [selectedDropdownIndex, setSelectedDropdownIndex] = useState(0)
+  
+  // Prompt dropdown state
+  const [showPromptDropdown, setShowPromptDropdown] = useState(false)
+  const [promptFilter, setPromptFilter] = useState('')
+  const [promptPosition, setPromptPosition] = useState(0)
+  const [selectedPromptIndex, setSelectedPromptIndex] = useState(0)
+  const [prompts, setPrompts] = useState<any[]>([])
+  
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const promptDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Load prompts when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadPrompts()
+    }
+  }, [projectId])
+
+  const loadPrompts = async () => {
+    if (!projectId) return
+    try {
+      const data = await api.listPrompts(projectId)
+      setPrompts(data)
+    } catch (err) {
+      console.error('Failed to load prompts:', err)
+    }
+  }
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -75,14 +102,51 @@ export function ChatInterface({
     }
   }, [input])
 
+  // Handle # prompts
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const cursorPos = textarea.selectionStart
+    const textBeforeCursor = input.slice(0, cursorPos)
+    const lastHashIndex = textBeforeCursor.lastIndexOf('#')
+    
+    if (lastHashIndex !== -1 && lastHashIndex === textBeforeCursor.length - 1) {
+      // Just typed #
+      setShowPromptDropdown(true)
+      setPromptFilter('')
+      setPromptPosition(lastHashIndex)
+    } else if (lastHashIndex !== -1) {
+      const textAfterHash = textBeforeCursor.slice(lastHashIndex + 1)
+      if (!textAfterHash.includes(' ') && textAfterHash.length > 0) {
+        // Typing after #
+        setShowPromptDropdown(true)
+        setPromptFilter(textAfterHash)
+        setPromptPosition(lastHashIndex)
+      } else if (textAfterHash.includes(' ')) {
+        setShowPromptDropdown(false)
+      }
+    } else {
+      setShowPromptDropdown(false)
+    }
+  }, [input])
+
   const filteredFiles = availableFiles.filter(file => 
     file.toLowerCase().includes(mentionFilter.toLowerCase())
   ).slice(0, 10)
 
-  // Reset selected index when filtered files change
+  const filteredPrompts = prompts.filter(prompt =>
+    prompt.name.toLowerCase().includes(promptFilter.toLowerCase())
+  ).slice(0, 10)
+
+  // Reset selected index when filtered items change
   useEffect(() => {
     setSelectedDropdownIndex(0)
   }, [mentionFilter])
+
+  useEffect(() => {
+    setSelectedPromptIndex(0)
+  }, [promptFilter])
 
   // Auto-scroll selected item into view
   useEffect(() => {
@@ -93,6 +157,15 @@ export function ChatInterface({
       }
     }
   }, [selectedDropdownIndex, showMentionDropdown])
+
+  useEffect(() => {
+    if (promptDropdownRef.current && showPromptDropdown) {
+      const selectedElement = promptDropdownRef.current.children[selectedPromptIndex] as HTMLElement
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [selectedPromptIndex, showPromptDropdown])
 
   const handleMentionSelect = (file: string) => {
     const beforeMention = input.slice(0, mentionPosition)
@@ -105,6 +178,17 @@ export function ChatInterface({
     if (!mentionedFiles.includes(file)) {
       setMentionedFiles([...mentionedFiles, file])
     }
+    
+    textareaRef.current?.focus()
+  }
+
+  const handlePromptSelect = (prompt: any) => {
+    const beforePrompt = input.slice(0, promptPosition)
+    const afterPrompt = input.slice(textareaRef.current?.selectionStart || input.length)
+    // Insert prompt content at cursor position
+    const newInput = beforePrompt + prompt.content + afterPrompt
+    setInput(newInput)
+    setShowPromptDropdown(false)
     
     textareaRef.current?.focus()
   }
@@ -123,7 +207,30 @@ export function ChatInterface({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle dropdown navigation
+    // Handle prompt dropdown navigation
+    if (showPromptDropdown && filteredPrompts.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedPromptIndex(prev => 
+          prev < filteredPrompts.length - 1 ? prev + 1 : prev
+        )
+        return
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedPromptIndex(prev => prev > 0 ? prev - 1 : prev)
+        return
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        handlePromptSelect(filteredPrompts[selectedPromptIndex])
+        return
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowPromptDropdown(false)
+        return
+      }
+    }
+
+    // Handle mention dropdown navigation
     if (showMentionDropdown && filteredFiles.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -222,7 +329,7 @@ export function ChatInterface({
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message... (@ to mention files, Shift+Enter for new line)"
+                placeholder="Type a message... (@ to mention files, # for prompts, Shift+Enter for new line)"
                 className="w-full bg-transparent border-none text-white text-[15px] placeholder-white/40 
                   resize-none outline-none leading-6 max-h-[200px]"
                 rows={1}
@@ -253,6 +360,34 @@ export function ChatInterface({
                   ))}
                 </div>
               )}
+
+              {/* Prompt Dropdown */}
+              {showPromptDropdown && filteredPrompts.length > 0 && (
+                <div
+                  ref={promptDropdownRef}
+                  className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-[#2a2a2a] 
+                    border border-[rgba(255,255,255,0.08)] rounded-xl shadow-2xl z-50">
+
+                  {filteredPrompts.map((prompt, index) => (
+                    <button
+                      key={prompt.id}
+                      type="button"
+                      onClick={() => handlePromptSelect(prompt)}
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors
+                        ${index === selectedPromptIndex 
+                          ? 'bg-green-500/20 text-white border-l-2 border-green-500' 
+                          : 'text-white/90 hover:bg-white/8'
+                        }`}
+                    >
+                      <MessageSquare className="w-4 h-4 text-green-400" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-sm">#{prompt.name}</div>
+                        <div className="text-xs text-white/50 truncate">{prompt.content.slice(0, 50)}...</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             
             <button
@@ -268,7 +403,7 @@ export function ChatInterface({
           </div>
           
           <p className="text-xs text-white/30 mt-2 text-center">
-            Pro tip: Use @ to mention files • Shift+Enter for new line
+            Pro tip: Use @ to mention files • # for prompts • Shift+Enter for new line
           </p>
         </form>
       </div>

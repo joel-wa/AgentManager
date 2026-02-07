@@ -398,6 +398,61 @@ class ApiService {
       eventSource.close();
     };
   }
+
+  // Prompts API (local storage for now, can be moved to backend later)
+  async listPrompts(projectId: string): Promise<any[]> {
+    const key = `prompts_${projectId}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) return [];
+    
+    try {
+      const prompts = JSON.parse(stored);
+      return prompts.map((p: any) => ({
+        ...p,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async createPrompt(projectId: string, name: string, content: string): Promise<any> {
+    const prompts = await this.listPrompts(projectId);
+    const newPrompt = {
+      id: `prompt-${Date.now()}`,
+      name,
+      content,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    
+    const updated = [...prompts, newPrompt];
+    const key = `prompts_${projectId}`;
+    localStorage.setItem(key, JSON.stringify(updated));
+    
+    return newPrompt;
+  }
+
+  async updatePrompt(projectId: string, promptId: string, name: string, content: string): Promise<void> {
+    const prompts = await this.listPrompts(projectId);
+    const updated = prompts.map(p =>
+      p.id === promptId
+        ? { ...p, name, content, updatedAt: new Date() }
+        : p
+    );
+    
+    const key = `prompts_${projectId}`;
+    localStorage.setItem(key, JSON.stringify(updated));
+  }
+
+  async deletePrompt(projectId: string, promptId: string): Promise<void> {
+    const prompts = await this.listPrompts(projectId);
+    const updated = prompts.filter(p => p.id !== promptId);
+    
+    const key = `prompts_${projectId}`;
+    localStorage.setItem(key, JSON.stringify(updated));
+  }
 }
 
 // Export singleton instance

@@ -3,6 +3,7 @@ import { ChatInterface } from './components/ChatInterface'
 import { FileBrowser, FileItem } from './components/FileBrowser'
 import { Timeline } from './components/Timeline'
 import { Insights } from './components/Insights'
+import { Prompts } from './components/Prompts'
 import { TopBar } from './components/TopBar'
 import { NewProjectModal } from './components/NewProjectModal'
 import { FileViewer } from './components/FileViewer'
@@ -14,6 +15,7 @@ import {
   FolderTree, 
   Clock, 
   Lightbulb,
+  MessageSquare,
   PanelRightClose,
   PanelRightOpen
 } from 'lucide-react'
@@ -63,7 +65,7 @@ export type Suggestion = {
   affectedFiles?: string[]
 }
 
-type SidePanel = 'files' | 'search' | 'timeline' | 'insights' | 'file-viewer'
+type SidePanel = 'files' | 'search' | 'timeline' | 'insights' | 'prompts' | 'file-viewer'
 
 function App() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
@@ -740,7 +742,8 @@ function App() {
   const sidePanelTabs = [
     { id: 'files' as SidePanel, icon: FolderTree, label: 'Files' },
     { id: 'timeline' as SidePanel, icon: Clock, label: 'Timeline' },
-    { id: 'insights' as SidePanel, icon: Lightbulb, label: 'Insights' }
+    { id: 'insights' as SidePanel, icon: Lightbulb, label: 'Insights' },
+    { id: 'prompts' as SidePanel, icon: MessageSquare, label: 'Prompts' }
   ]
 
   return (
@@ -836,6 +839,11 @@ function App() {
                   onTrigger={handleTriggerMaintenance}
                   projectId={currentProject?.id}
                   isProcessing={isProcessingSuggestion}
+                />
+              )}
+              {sidePanel === 'prompts' && (
+                <Prompts 
+                  projectId={currentProject?.id}
                 />
               )}
               {sidePanel === 'file-viewer' && viewingFile && (
