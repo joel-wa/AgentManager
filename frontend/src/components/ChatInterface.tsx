@@ -28,6 +28,7 @@ export function ChatInterface({
   const [showMentionDropdown, setShowMentionDropdown] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
   const [mentionPosition, setMentionPosition] = useState(0)
+  const [selectedDropdownIndex, setSelectedDropdownIndex] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -76,10 +77,26 @@ export function ChatInterface({
     file.toLowerCase().includes(mentionFilter.toLowerCase())
   ).slice(0, 10)
 
+  // Reset selected index when filtered files change
+  useEffect(() => {
+    setSelectedDropdownIndex(0)
+  }, [mentionFilter])
+
+  // Auto-scroll selected item into view
+  useEffect(() => {
+    if (dropdownRef.current && showMentionDropdown) {
+      const selectedElement = dropdownRef.current.children[selectedDropdownIndex] as HTMLElement
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }
+  }, [selectedDropdownIndex, showMentionDropdown])
+
   const handleMentionSelect = (file: string) => {
     const beforeMention = input.slice(0, mentionPosition)
     const afterMention = input.slice(textareaRef.current?.selectionStart || input.length)
-    const newInput = beforeMention + `@${file} ` + afterMention
+    // Remove @ prefix when inserting the file
+    const newInput = beforeMention + `${file} ` + afterMention
     setInput(newInput)
     setShowMentionDropdown(false)
     
@@ -104,6 +121,29 @@ export function ChatInterface({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle dropdown navigation
+    if (showMentionDropdown && filteredFiles.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedDropdownIndex(prev => 
+          prev < filteredFiles.length - 1 ? prev + 1 : prev
+        )
+        return
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedDropdownIndex(prev => prev > 0 ? prev - 1 : prev)
+        return
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        handleMentionSelect(filteredFiles[selectedDropdownIndex])
+        return
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setShowMentionDropdown(false)
+        return
+      }
+    }
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
@@ -193,13 +233,16 @@ export function ChatInterface({
                   className="absolute bottom-full left-0 mb-2 w-full max-h-60 overflow-y-auto bg-[#2a2a2a] 
                     border border-[rgba(255,255,255,0.08)] rounded-xl shadow-2xl z-50">
 
-                  {filteredFiles.map(file => (
+                  {filteredFiles.map((file, index) => (
                     <button
                       key={file}
                       type="button"
                       onClick={() => handleMentionSelect(file)}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-white/8 text-left text-sm text-white/90 
-                        transition-colors"
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors
+                        ${index === selectedDropdownIndex 
+                          ? 'bg-blue-500/20 text-white border-l-2 border-blue-500' 
+                          : 'text-white/90 hover:bg-white/8'
+                        }`}
                     >
                       <FileText className="w-4 h-4 text-blue-400" />
                       <span>{file}</span>
