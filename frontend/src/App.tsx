@@ -707,8 +707,8 @@ function App() {
         content
       })
     } catch (error) {
-      // Fail silently as per requirement - just log to console
-      console.log('Could not open file:', filePath, error)
+      // Fail silently as per requirement - log to console for debugging
+      console.error('Could not open file:', filePath, error)
     } finally {
       setFileLoading(false)
     }

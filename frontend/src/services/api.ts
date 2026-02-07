@@ -3,6 +3,8 @@
  * All requests go through Rust Core (port 8000) which coordinates with Python services
  */
 
+import type { Prompt, PromptData } from '../types/prompt'
+
 const RUST_CORE_URL = 'http://localhost:8000';
 
 export interface Project {
@@ -400,14 +402,14 @@ class ApiService {
   }
 
   // Prompts API (local storage for now, can be moved to backend later)
-  async listPrompts(projectId: string): Promise<any[]> {
+  async listPrompts(projectId: string): Promise<Prompt[]> {
     const key = `prompts_${projectId}`;
     const stored = localStorage.getItem(key);
     if (!stored) return [];
     
     try {
-      const prompts = JSON.parse(stored);
-      return prompts.map((p: any) => ({
+      const prompts: PromptData[] = JSON.parse(stored);
+      return prompts.map((p) => ({
         ...p,
         createdAt: new Date(p.createdAt),
         updatedAt: new Date(p.updatedAt),
@@ -417,9 +419,9 @@ class ApiService {
     }
   }
 
-  async createPrompt(projectId: string, name: string, content: string): Promise<any> {
+  async createPrompt(projectId: string, name: string, content: string): Promise<Prompt> {
     const prompts = await this.listPrompts(projectId);
-    const newPrompt = {
+    const newPrompt: Prompt = {
       id: `prompt-${Date.now()}`,
       name,
       content,
@@ -429,7 +431,12 @@ class ApiService {
     
     const updated = [...prompts, newPrompt];
     const key = `prompts_${projectId}`;
-    localStorage.setItem(key, JSON.stringify(updated));
+    const promptData: PromptData[] = updated.map(p => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+    localStorage.setItem(key, JSON.stringify(promptData));
     
     return newPrompt;
   }
@@ -443,7 +450,12 @@ class ApiService {
     );
     
     const key = `prompts_${projectId}`;
-    localStorage.setItem(key, JSON.stringify(updated));
+    const promptData: PromptData[] = updated.map(p => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+    localStorage.setItem(key, JSON.stringify(promptData));
   }
 
   async deletePrompt(projectId: string, promptId: string): Promise<void> {
@@ -451,7 +463,12 @@ class ApiService {
     const updated = prompts.filter(p => p.id !== promptId);
     
     const key = `prompts_${projectId}`;
-    localStorage.setItem(key, JSON.stringify(updated));
+    const promptData: PromptData[] = updated.map(p => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+    }));
+    localStorage.setItem(key, JSON.stringify(promptData));
   }
 }
 

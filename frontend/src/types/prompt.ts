@@ -5,3 +5,11 @@ export interface Prompt {
   createdAt: Date
   updatedAt: Date
 }
+
+export interface PromptData {
+  id: string
+  name: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}

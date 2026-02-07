@@ -153,18 +153,22 @@ export function ChatInterface({
   // Auto-scroll selected item into view
   useEffect(() => {
     if (dropdownRef.current && showMentionDropdown) {
-      const selectedElement = dropdownRef.current.children[selectedDropdownIndex] as HTMLElement
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      if (selectedDropdownIndex < dropdownRef.current.children.length) {
+        const selectedElement = dropdownRef.current.children[selectedDropdownIndex] as HTMLElement
+        if (selectedElement) {
+          selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
       }
     }
   }, [selectedDropdownIndex, showMentionDropdown])
 
   useEffect(() => {
     if (promptDropdownRef.current && showPromptDropdown) {
-      const selectedElement = promptDropdownRef.current.children[selectedPromptIndex] as HTMLElement
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      if (selectedPromptIndex < promptDropdownRef.current.children.length) {
+        const selectedElement = promptDropdownRef.current.children[selectedPromptIndex] as HTMLElement
+        if (selectedElement) {
+          selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
       }
     }
   }, [selectedPromptIndex, showPromptDropdown])
@@ -172,7 +176,7 @@ export function ChatInterface({
   const handleMentionSelect = (file: string) => {
     const beforeMention = input.slice(0, mentionPosition)
     const afterMention = input.slice(textareaRef.current?.selectionStart || input.length)
-    // Remove @ prefix when inserting the file
+    // Insert file name without @ prefix (mentionPosition points to @ character, so we replace from there)
     const newInput = beforeMention + `${file} ` + afterMention
     setInput(newInput)
     setShowMentionDropdown(false)
@@ -394,7 +398,9 @@ export function ChatInterface({
                       <MessageSquare className="w-4 h-4 text-green-400" />
                       <div className="flex-1 min-w-0">
                         <div className="font-mono text-sm">#{prompt.name}</div>
-                        <div className="text-xs text-white/50 truncate">{prompt.content.slice(0, 50)}...</div>
+                        <div className="text-xs text-white/50 truncate">
+                          {prompt.content.length > 50 ? prompt.content.slice(0, 50) + '...' : prompt.content}
+                        </div>
                       </div>
                     </button>
                   ))}

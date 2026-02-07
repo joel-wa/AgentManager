@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Search, FileText } from 'lucide-react'
 
+const MAX_SEARCH_RESULTS = 50
+
 type Props = {
   isOpen: boolean
   onClose: () => void
@@ -17,7 +19,7 @@ export function SearchModal({ isOpen, onClose, availableFiles, onFileSelect }: P
   // Filter files based on search query
   const filteredFiles = availableFiles.filter(file =>
     file.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 50) // Limit to 50 results for performance
+  ).slice(0, MAX_SEARCH_RESULTS) // Limit results for performance
 
   // Reset selected index when search changes
   useEffect(() => {
