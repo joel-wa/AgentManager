@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 use std::fs;
 use chrono::Utc;
-use git2::{Repository, Signature, IndexAddOption, Oid, DiffOptions};
+use git2::{Repository, Signature, IndexAddOption, Oid};
 
-use crate::models::{Project, FileItem, FileType, VersionMetadata, VersionEntry, VersionHistory, TimelineEntry, FileAction};
+use crate::models::{Project, FileItem, FileType, VersionMetadata, VersionEntry, VersionHistory};
 
 /// Manages the workspace directory and projects
 pub struct WorkspaceManager {
@@ -569,115 +569,5 @@ This file tracks decisions, discussions, and important changes.
         );
         
         Ok(())
-    }
-
-    /// Get git commit history as timeline entries
-    pub fn get_commit_timeline(&self, project_id: &str, limit: usize) -> anyhow::Result<Vec<TimelineEntry>> {
-        let repo = self.get_git_repo(project_id)?;
-        let mut revwalk = repo.revwalk()?;
-        revwalk.push_head()?;
-
-        let mut entries = Vec::new();
-        let mut count = 0;
-
-        for oid in revwalk {
-            if count >= limit {
-                break;
-            }
-
-            let oid = oid?;
-            let commit = repo.find_commit(oid)?;
-            
-            // Get commit metadata
-            let timestamp = match chrono::DateTime::from_timestamp(commit.time().seconds(), 0) {
-                Some(ts) => ts,
-                None => {
-                    tracing::warn!("Invalid timestamp for commit {}, skipping", oid);
-                    continue;
-                }
-            };
-            let message = commit.message().unwrap_or("(no commit message)").to_string();
-            
-            // Get list of files changed in this commit
-            let mut files = Vec::new();
-            
-            // Get the tree for this commit
-            let tree = commit.tree()?;
-            
-            // Compare with parent to find changed files
-            if commit.parent_count() > 0 {
-                let parent = commit.parent(0)?;
-                let parent_tree = parent.tree()?;
-                
-                let mut diff_opts = DiffOptions::new();
-                let diff = repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut diff_opts))?;
-                
-                diff.foreach(
-                    &mut |delta, _progress| {
-                        let file_path = match delta.new_file().path().and_then(|p| p.to_str()) {
-                            Some(path) => path,
-                            None => {
-                                tracing::warn!("Invalid UTF-8 file path in commit {}", oid);
-                                return true; // Skip this file
-                            }
-                        };
-                        
-                        let action = match delta.status() {
-                            git2::Delta::Added => "created",
-                            git2::Delta::Deleted => "deleted",
-                            git2::Delta::Modified => "modified",
-                            git2::Delta::Renamed => "renamed",
-                            _ => "modified",
-                        };
-                        
-                        files.push(FileAction {
-                            action: action.to_string(),
-                            path: file_path.to_string(),
-                        });
-                        
-                        true
-                    },
-                    None,
-                    None,
-                    None,
-                )?;
-            } else {
-                // First commit - all files are "created"
-                let mut tree_entries = Vec::new();
-                tree.walk(git2::TreeWalkMode::PreOrder, |dir, entry| {
-                    if let Some(name) = entry.name() {
-                        if entry.kind() == Some(git2::ObjectType::Blob) {
-                            let path = if dir.is_empty() {
-                                name.to_string()
-                            } else {
-                                format!("{}{}", dir, name)
-                            };
-                            tree_entries.push(path);
-                        }
-                    }
-                    git2::TreeWalkResult::Ok
-                })?;
-                
-                for path in tree_entries {
-                    files.push(FileAction {
-                        action: "created".to_string(),
-                        path,
-                    });
-                }
-            }
-            
-            // Only add entries that actually changed files (skip merge commits with no changes)
-            if !files.is_empty() {
-                entries.push(TimelineEntry {
-                    id: oid.to_string(),
-                    timestamp,
-                    title: message.lines().next().unwrap_or("(no commit message)").to_string(),
-                    files,
-                });
-                count += 1;
-            }
-        }
-
-        Ok(entries)
     }
 }

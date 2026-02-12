@@ -19,7 +19,7 @@ class CloudClient:
         
         # Ollama configuration (separate from main agent)
         self.ollama_url = os.getenv("MAINTENANCE_OLLAMA_URL") or os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-        self.ollama_model = os.getenv("MAINTENANCE_OLLAMA_MODEL") or os.getenv("OLLAMA_MODEL", "glm-4.6:cloud")
+        self.ollama_model = os.getenv("MAINTENANCE_OLLAMA_MODEL") or os.getenv("OLLAMA_MODEL", "glm-4.7:cloud")
         
         self.timeout = 60.0
     

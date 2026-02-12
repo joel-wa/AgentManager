@@ -82,8 +82,8 @@ if ai_provider == "copilot":
     print("[MAIN AGENT] Using GitHub Copilot CLI as AI provider")
     ai_client = CopilotClient()
 else:
-    print(f"[MAIN AGENT] Using Ollama as AI provider (model: glm-4.6:cloud)")
-    ai_client = OllamaClient(model="glm-4.6:cloud")
+    print(f"[MAIN AGENT] Using Ollama as AI provider (model: glm-4.7:cloud)")
+    ai_client = OllamaClient(model="glm-4.7:cloud")
     # OllamaClient(model="qwen3-vl:235b-cloud")
 
 tool_executor = ToolExecutor()
