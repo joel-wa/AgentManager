@@ -11,10 +11,10 @@ $rootDir = $PSScriptRoot
 Write-Host "Starting services..." -ForegroundColor Green
 
 # Main Agent
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$rootDir\python-services\main_agent'; python main.py" -WindowStyle Minimized
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$rootDir\python-services\main_agent'; uv run python main.py" -WindowStyle Minimized
 
 # Embeddings  
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$rootDir\python-services\embeddings'; python main.py" -WindowStyle Minimized
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$rootDir\python-services\embeddings'; uv run python main.py" -WindowStyle Minimized
 
 Start-Sleep -Seconds 3
 

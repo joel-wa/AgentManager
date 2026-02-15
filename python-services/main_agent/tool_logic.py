@@ -133,11 +133,11 @@ class SearchTool(BaseTool):
             ignore_dirs = {'.git', '__pycache__', 'node_modules', 'target', 'dist', 
                           'build', '.venv', 'venv', '.cache', '.pytest_cache'}
             
-            # File extensions to search (text files only)
+            # File extensions to search (text files and PDFs)
             text_extensions = {'.py', '.js', '.ts', '.tsx', '.jsx', '.md', '.txt', 
                              '.json', '.yaml', '.yml', '.toml', '.rs', '.go', 
                              '.java', '.cpp', '.c', '.h', '.hpp', '.html', '.css',
-                             '.sql', '.sh', '.bat', '.ps1', '.xml', '.ini', '.conf'}
+                             '.sql', '.sh', '.bat', '.ps1', '.xml', '.ini', '.conf', '.pdf'}
             
             # Walk through directory
             for root, dirs, files in os.walk(working_directory):
@@ -161,19 +161,52 @@ class SearchTool(BaseTool):
                     rel_path = os.path.relpath(filepath, working_directory)
                     
                     try:
-                        # Read file and search for query
-                        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                            for line_num, line in enumerate(f, 1):
-                                if query_lower in line.lower():
-                                    matches.append({
-                                        "file": rel_path,
-                                        "line": line_num,
-                                        "content": line.strip()[:200],  # Limit line length
-                                        "relevance": 1.0  # Simple grep doesn't score relevance
-                                    })
+                        # Handle PDF files differently
+                        if ext == '.pdf':
+                            try:
+                                from pypdf import PdfReader
+                                reader = PdfReader(filepath)
+                                for page_num, page in enumerate(reader.pages, 1):
+                                    try:
+                                        page_text = page.extract_text()
+                                        if query_lower in page_text.lower():
+                                            # Find the line containing the query
+                                            for line_num, line in enumerate(page_text.split('\n'), 1):
+                                                if query_lower in line.lower():
+                                                    matches.append({
+                                                        "file": rel_path,
+                                                        "line": f"page {page_num}, line {line_num}",
+                                                        "content": line.strip()[:200],
+                                                        "relevance": 1.0
+                                                    })
+                                                    
+                                                    if len(matches) >= max_results:
+                                                        break
+                                    except:
+                                        continue
                                     
                                     if len(matches) >= max_results:
                                         break
+                            except ImportError:
+                                # pypdf not installed, skip PDF files
+                                continue
+                            except:
+                                # Skip problematic PDFs
+                                continue
+                        else:
+                            # Read text file and search for query
+                            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                                for line_num, line in enumerate(f, 1):
+                                    if query_lower in line.lower():
+                                        matches.append({
+                                            "file": rel_path,
+                                            "line": line_num,
+                                            "content": line.strip()[:200],  # Limit line length
+                                            "relevance": 1.0  # Simple grep doesn't score relevance
+                                        })
+                                        
+                                        if len(matches) >= max_results:
+                                            break
                     except (PermissionError, UnicodeDecodeError, IsADirectoryError):
                         # Skip files we can't read
                         continue
@@ -196,7 +229,7 @@ class SearchTool(BaseTool):
 
 
 class ReadFileTool(BaseTool):
-    """Read file contents"""
+    """Read file contents (supports text files and PDFs)"""
     
     @property
     def name(self) -> str:
@@ -204,7 +237,7 @@ class ReadFileTool(BaseTool):
     
     @property
     def description(self) -> str:
-        return "Read the contents of a file at the specified path"
+        return "Read the contents of a file at the specified path (supports text files and PDFs)"
     
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -232,20 +265,69 @@ class ReadFileTool(BaseTool):
                 error="No path provided"
             )
         
+        # Check if file is a PDF
+        is_pdf = path.lower().endswith('.pdf')
+        
         try:
-            # Read file asynchronously
-            import aiofiles
-            async with aiofiles.open(path, 'r', encoding='utf-8') as f:
-                content = await f.read()
-            
-            return ToolResult(
-                success=True,
-                result={
-                    "path": path,
-                    "content": content,
-                    "size_bytes": len(content.encode('utf-8'))
-                }
-            )
+            if is_pdf:
+                # Extract text from PDF
+                try:
+                    from pypdf import PdfReader
+                    reader = PdfReader(path)
+                    text_content = []
+                    
+                    for page_num, page in enumerate(reader.pages, 1):
+                        try:
+                            page_text = page.extract_text()
+                            if page_text.strip():
+                                text_content.append(f"--- Page {page_num} ---\n{page_text}")
+                        except Exception as e:
+                            text_content.append(f"--- Page {page_num} ---\n[Error extracting text: {str(e)}]")
+                    
+                    content = "\n\n".join(text_content)
+                    
+                    return ToolResult(
+                        success=True,
+                        result={
+                            "path": path,
+                            "content": content,
+                            "size_bytes": len(content.encode('utf-8')),
+                            "file_type": "pdf",
+                            "pages": len(reader.pages)
+                        }
+                    )
+                except ImportError:
+                    return ToolResult(
+                        success=False,
+                        result=None,
+                        error="PDF support not available. Install pypdf: pip install pypdf"
+                    )
+                except Exception as e:
+                    return ToolResult(
+                        success=False,
+                        result=None,
+                        error=f"Failed to read PDF: {str(e)}"
+                    )
+            else:
+                # Read text file asynchronously
+                try:
+                    import aiofiles
+                    async with aiofiles.open(path, 'r', encoding='utf-8') as f:
+                        content = await f.read()
+                except:
+                    # Fallback to sync read
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                
+                return ToolResult(
+                    success=True,
+                    result={
+                        "path": path,
+                        "content": content,
+                        "size_bytes": len(content.encode('utf-8')),
+                        "file_type": "text"
+                    }
+                )
         except FileNotFoundError:
             return ToolResult(
                 success=False,
@@ -259,24 +341,11 @@ class ReadFileTool(BaseTool):
                 error=f"Permission denied: {path}"
             )
         except Exception as e:
-            # Fallback to sync read if aiofiles not available
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                return ToolResult(
-                    success=True,
-                    result={
-                        "path": path,
-                        "content": content,
-                        "size_bytes": len(content.encode('utf-8'))
-                    }
-                )
-            except Exception as e:
-                return ToolResult(
-                    success=False,
-                    result=None,
-                    error=str(e)
-                )
+            return ToolResult(
+                success=False,
+                result=None,
+                error=str(e)
+            )
 
 
 class WriteFileTool(BaseTool):

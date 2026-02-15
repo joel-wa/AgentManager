@@ -49,7 +49,7 @@ try {
     Write-Host "[1/4] Starting Main Agent Service (port 8001)..." -ForegroundColor Green
     $mainAgentJob = Start-Job -ScriptBlock {
         Set-Location $using:rootDir\python-services\main_agent
-        python main.py
+        uv run python main.py
     }
     $jobs += $mainAgentJob
     Start-Sleep -Seconds 2
@@ -58,7 +58,7 @@ try {
     Write-Host "[2/4] Starting Maintenance Agent Service (port 8002)..." -ForegroundColor Green
     $maintenanceJob = Start-Job -ScriptBlock {
         Set-Location $using:rootDir\python-services\maintenance_agent
-        python main.py
+        uv run python main.py
     }
     $jobs += $maintenanceJob
     Start-Sleep -Seconds 2
@@ -67,7 +67,7 @@ try {
     Write-Host "[3/4] Starting Embeddings Service (port 8003)..." -ForegroundColor Green
     $embeddingsJob = Start-Job -ScriptBlock {
         Set-Location $using:rootDir\python-services\embeddings
-        python main.py
+        uv run python main.py
     }
     $jobs += $embeddingsJob
     Start-Sleep -Seconds 2
