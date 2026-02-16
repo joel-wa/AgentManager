@@ -12,6 +12,9 @@ import subprocess
 import os
 import sys
 import time
+import shutil
+import re
+from pathlib import Path
 
 
 @dataclass
@@ -21,6 +24,126 @@ class ToolResult:
     result: Any
     error: Optional[str] = None
     execution_time_ms: Optional[float] = None
+
+
+class VenvManager:
+    """Manages temporary virtual environments per project/session"""
+    
+    def __init__(self, venv_base_dir: Optional[str] = None):
+        """Initialize venv manager
+        
+        Args:
+            venv_base_dir: Base directory for storing venvs. 
+                          Defaults to ~/.agent-workspace/venvs
+        """
+        if venv_base_dir:
+            self.venv_base_dir = Path(venv_base_dir)
+        else:
+            # Use user home directory for venvs
+            home = Path.home()
+            self.venv_base_dir = home / '.agent-workspace' / 'venvs'
+        
+        # Ensure base directory exists
+        self.venv_base_dir.mkdir(parents=True, exist_ok=True)
+    
+    def get_venv_path(self, project_id: str) -> Path:
+        """Get the venv path for a specific project"""
+        return self.venv_base_dir / project_id
+    
+    def venv_exists(self, project_id: str) -> bool:
+        """Check if venv exists for a project"""
+        venv_path = self.get_venv_path(project_id)
+        
+        # Check for key venv markers
+        if sys.platform == "win32":
+            python_exe = venv_path / 'Scripts' / 'python.exe'
+        else:
+            python_exe = venv_path / 'bin' / 'python'
+        
+        return python_exe.exists()
+    
+    async def create_venv(self, project_id: str) -> tuple[bool, str]:
+        """Create a new venv for a project
+        
+        Returns:
+            (success, message) tuple
+        """
+        venv_path = self.get_venv_path(project_id)
+        
+        if self.venv_exists(project_id):
+            return True, f"Venv already exists at {venv_path}"
+        
+        try:
+            print(f"[VENV] Creating venv for project {project_id} at {venv_path}")
+            
+            # Create venv using current Python interpreter
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, '-m', 'venv', str(venv_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60
+            )
+            
+            if process.returncode != 0:
+                error_msg = stderr.decode('utf-8', errors='replace')
+                return False, f"Failed to create venv: {error_msg}"
+            
+            print(f"[VENV] Successfully created venv at {venv_path}")
+            return True, f"Created venv at {venv_path}"
+            
+        except asyncio.TimeoutError:
+            return False, "Venv creation timed out"
+        except Exception as e:
+            return False, f"Error creating venv: {str(e)}"
+    
+    def get_python_executable(self, project_id: str) -> Optional[str]:
+        """Get the Python executable path for a project's venv"""
+        if not self.venv_exists(project_id):
+            return None
+        
+        venv_path = self.get_venv_path(project_id)
+        
+        if sys.platform == "win32":
+            python_exe = venv_path / 'Scripts' / 'python.exe'
+        else:
+            python_exe = venv_path / 'bin' / 'python'
+        
+        return str(python_exe) if python_exe.exists() else None
+    
+    def get_pip_executable(self, project_id: str) -> Optional[str]:
+        """Get the pip executable path for a project's venv"""
+        if not self.venv_exists(project_id):
+            return None
+        
+        venv_path = self.get_venv_path(project_id)
+        
+        if sys.platform == "win32":
+            pip_exe = venv_path / 'Scripts' / 'pip.exe'
+        else:
+            pip_exe = venv_path / 'bin' / 'pip'
+        
+        return str(pip_exe) if pip_exe.exists() else None
+    
+    def delete_venv(self, project_id: str) -> tuple[bool, str]:
+        """Delete a project's venv
+        
+        Returns:
+            (success, message) tuple
+        """
+        venv_path = self.get_venv_path(project_id)
+        
+        if not venv_path.exists():
+            return True, "Venv does not exist"
+        
+        try:
+            shutil.rmtree(venv_path)
+            return True, f"Deleted venv at {venv_path}"
+        except Exception as e:
+            return False, f"Error deleting venv: {str(e)}"
 
 
 @dataclass
@@ -593,11 +716,13 @@ class ListDirectoryTool(BaseTool):
 
 
 class ExecuteCommandTool(BaseTool):
-    """Execute CLI commands (Windows/Unix compatible)"""
+    """Execute CLI commands (Windows/Unix compatible) with automatic venv support"""
     
-    def __init__(self, working_directory: Optional[str] = None, timeout: int = 60):
+    def __init__(self, working_directory: Optional[str] = None, timeout: int = 60, project_id: Optional[str] = None):
         self._working_directory = working_directory
         self._timeout = timeout
+        self._project_id = project_id
+        self._venv_manager = VenvManager() if project_id else None
     
     @property
     def name(self) -> str:
@@ -605,7 +730,7 @@ class ExecuteCommandTool(BaseTool):
     
     @property
     def description(self) -> str:
-        return "Execute a shell command and return the output. Works on Windows and Unix systems."
+        return "Execute a shell command and return the output. Works on Windows and Unix systems. Python/pip commands automatically use project-specific venv."
     
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -637,6 +762,115 @@ class ExecuteCommandTool(BaseTool):
     def requires_confirmation(self) -> bool:
         return True
     
+    async def _ensure_venv(self) -> tuple[bool, Optional[str]]:
+        """Ensure venv exists for this project
+        
+        Returns:
+            (success, error_message) tuple
+        """
+        if not self._project_id or not self._venv_manager:
+            return True, None
+        
+        if not self._venv_manager.venv_exists(self._project_id):
+            print(f"[VENV] Venv does not exist for project {self._project_id}, creating...")
+            success, message = await self._venv_manager.create_venv(self._project_id)
+            if not success:
+                return False, message
+            print(f"[VENV] {message}")
+        
+        return True, None
+    
+    def _transform_command_for_venv(self, command: str) -> str:
+        """Transform Python/pip commands to use project venv
+        
+        Handles multiple command patterns:
+        - python, python3, python2, py
+        - pip, pip3, pip2
+        - python -m pip
+        - Full paths like C:\\Python311\\python.exe
+        - py -3.11 -m pip
+        
+        Args:
+            command: Original command string
+            
+        Returns:
+            Transformed command that uses venv executables
+        """
+        if not self._project_id or not self._venv_manager:
+            return command
+        
+        command_stripped = command.strip()
+        
+        # Pattern 1: Direct pip commands (pip, pip3, pip2, pip.exe, etc.)
+        # Matches: pip install, pip3 install, pip.exe list
+        pip_pattern = r'^(pip\d*(?:\.exe)?)\s+'
+        pip_match = re.match(pip_pattern, command_stripped, re.IGNORECASE)
+        
+        if pip_match:
+            venv_pip = self._venv_manager.get_pip_executable(self._project_id)
+            if venv_pip:
+                # Replace pip command with venv pip
+                original_pip_cmd = pip_match.group(1)
+                rest_of_command = command_stripped[len(original_pip_cmd):].strip()
+                transformed = f'"{venv_pip}" {rest_of_command}'
+                print(f"[VENV] Transformed '{original_pip_cmd}' to use venv pip")
+                return transformed
+        
+        # Pattern 2: Python commands - direct invocation
+        # Matches: python, python3, python.exe, py, py.exe
+        # Also matches full paths: C:\Python311\python.exe, /usr/bin/python3
+        python_simple_pattern = r'^((?:[a-zA-Z]:[\\\/])?(?:[\w\-\.\\\/]+[\\\/])?(?:python\d*(?:\.exe)?|py(?:\.exe)?))\s+'
+        python_match = re.match(python_simple_pattern, command_stripped, re.IGNORECASE)
+        
+        if python_match:
+            venv_python = self._venv_manager.get_python_executable(self._project_id)
+            if venv_python:
+                original_python_cmd = python_match.group(1)
+                rest_of_command = command_stripped[len(original_python_cmd):].strip()
+                
+                # Special handling for "python -m pip" - use venv pip directly
+                if rest_of_command.startswith('-m pip'):
+                    venv_pip = self._venv_manager.get_pip_executable(self._project_id)
+                    if venv_pip:
+                        # Extract what comes after "-m pip"
+                        pip_args = rest_of_command[6:].strip()  # Remove "-m pip"
+                        transformed = f'"{venv_pip}" {pip_args}'
+                        print(f"[VENV] Transformed 'python -m pip' to use venv pip")
+                        return transformed
+                
+                # Regular python command
+                transformed = f'"{venv_python}" {rest_of_command}'
+                print(f"[VENV] Transformed '{original_python_cmd}' to use venv python")
+                return transformed
+        
+        # Pattern 3: Windows Python Launcher with version specifier
+        # Matches: py -3.11, py -3, py -2
+        py_version_pattern = r'^py(?:\.exe)?\s+-\d+(?:\.\d+)?\s+'
+        py_version_match = re.match(py_version_pattern, command_stripped, re.IGNORECASE)
+        
+        if py_version_match:
+            venv_python = self._venv_manager.get_python_executable(self._project_id)
+            if venv_python:
+                # Extract everything after the version specifier
+                matched_part = py_version_match.group(0)
+                rest_of_command = command_stripped[len(matched_part):].strip()
+                
+                # Check for -m pip pattern
+                if rest_of_command.startswith('-m pip'):
+                    venv_pip = self._venv_manager.get_pip_executable(self._project_id)
+                    if venv_pip:
+                        pip_args = rest_of_command[6:].strip()
+                        transformed = f'"{venv_pip}" {pip_args}'
+                        print(f"[VENV] Transformed 'py -X.X -m pip' to use venv pip")
+                        return transformed
+                
+                # Regular py command
+                transformed = f'"{venv_python}" {rest_of_command}'
+                print(f"[VENV] Transformed 'py -X.X' to use venv python")
+                return transformed
+        
+        return command
+    
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         command = args.get("command", "")
         working_dir = args.get("working_directory", self._working_directory)
@@ -648,6 +882,19 @@ class ExecuteCommandTool(BaseTool):
                 result=None,
                 error="No command provided"
             )
+        
+        # Ensure venv exists if this is a project command
+        venv_success, venv_error = await self._ensure_venv()
+        if not venv_success:
+            return ToolResult(
+                success=False,
+                result=None,
+                error=f"Failed to prepare venv: {venv_error}"
+            )
+        
+        # Transform command to use venv if applicable
+        original_command = command
+        command = self._transform_command_for_venv(command)
         
         start_time = time.time()
         
@@ -964,9 +1211,10 @@ class DeleteFileTool(BaseTool):
 class ToolRegistry:
     """Central registry for all tools - easily extensible"""
     
-    def __init__(self, working_directory: Optional[str] = None):
+    def __init__(self, working_directory: Optional[str] = None, project_id: Optional[str] = None):
         self._tools: Dict[str, BaseTool] = {}
         self._working_directory = working_directory
+        self._project_id = project_id
         self._register_default_tools()
     
     def _register_default_tools(self):
@@ -976,7 +1224,10 @@ class ToolRegistry:
             ReadFileTool(),
             WriteFileTool(),
             ListDirectoryTool(),
-            ExecuteCommandTool(working_directory=self._working_directory),
+            ExecuteCommandTool(
+                working_directory=self._working_directory,
+                project_id=self._project_id
+            ),
             FindRecentsTool(),
             CreateDirectoryTool(),
             DeleteFileTool(),
@@ -1023,7 +1274,10 @@ class ToolExecutor:
         self._working_directory = working_directory
         self._project_id = project_id
         self._rust_core_url = rust_core_url
-        self.registry = ToolRegistry(working_directory=working_directory)
+        self.registry = ToolRegistry(
+            working_directory=working_directory,
+            project_id=project_id
+        )
     
     def _resolve_path(self, path: str) -> str:
         """Resolve a path relative to working directory"""
