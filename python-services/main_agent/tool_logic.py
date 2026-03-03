@@ -605,7 +605,22 @@ class WriteFileTool(BaseTool):
 
 
 class ListDirectoryTool(BaseTool):
-    """List directory contents"""
+    """List directory contents with smart filtering"""
+    
+    # Common directories to exclude in recursive listings (prevent context overflow)
+    EXCLUDE_DIRS = {
+        'node_modules', '__pycache__', '.git', '.svn', '.hg',
+        'venv', '.venv', 'env', '.env', 'virtualenv',
+        'dist', 'build', '.next', '.nuxt', 
+        'target',  # Rust/Java builds
+        '.idea', '.vscode', '.vs',  # IDE files
+        'coverage', '.coverage', '.pytest_cache', '.mypy_cache',
+        'vendor',  # PHP/Go dependencies
+        '.angular', '.nx',  # Angular/Nx cache
+    }
+    
+    # Maximum entries to prevent context overflow
+    MAX_ENTRIES = 500
     
     @property
     def name(self) -> str:
@@ -613,7 +628,7 @@ class ListDirectoryTool(BaseTool):
     
     @property
     def description(self) -> str:
-        return "List files and folders in a directory"
+        return "List files and folders in a directory (excludes node_modules, __pycache__, .git, venv, etc. in recursive mode to prevent overflow)"
     
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -627,8 +642,13 @@ class ListDirectoryTool(BaseTool):
                 },
                 "recursive": {
                     "type": "boolean",
-                    "description": "Whether to list recursively",
+                    "description": "Whether to list recursively (auto-excludes bloat dirs)",
                     "default": False
+                },
+                "max_entries": {
+                    "type": "integer",
+                    "description": "Maximum entries to return (default: 500)",
+                    "default": 500
                 }
             }
         }
@@ -637,9 +657,14 @@ class ListDirectoryTool(BaseTool):
     def category(self) -> str:
         return "file_operations"
     
+    def _should_exclude_dir(self, dir_name: str) -> bool:
+        """Check if directory should be excluded"""
+        return dir_name in self.EXCLUDE_DIRS or dir_name.startswith('.')
+    
     async def execute(self, args: Dict[str, Any]) -> ToolResult:
         path = args.get("path", ".")
         recursive = args.get("recursive", False)
+        max_entries = args.get("max_entries", self.MAX_ENTRIES)
         
         try:
             if not os.path.exists(path):
@@ -650,11 +675,28 @@ class ListDirectoryTool(BaseTool):
                 )
             
             entries = []
+            excluded_dirs = set()
+            truncated = False
             
             if recursive:
-                # Recursive listing
+                # Recursive listing with smart filtering
                 for root, dirs, files in os.walk(path):
+                    # Filter out excluded directories IN-PLACE (prevents os.walk from entering them)
+                    dirs_to_exclude = [d for d in dirs if self._should_exclude_dir(d)]
+                    for excluded in dirs_to_exclude:
+                        excluded_dirs.add(excluded)
+                        dirs.remove(excluded)
+                    
+                    # Check entry limit
+                    if len(entries) >= max_entries:
+                        truncated = True
+                        break
+                    
+                    # Add remaining directories
                     for name in dirs:
+                        if len(entries) >= max_entries:
+                            truncated = True
+                            break
                         full_path = os.path.join(root, name)
                         rel_path = os.path.relpath(full_path, path)
                         entries.append({
@@ -662,7 +704,15 @@ class ListDirectoryTool(BaseTool):
                             "type": "directory",
                             "path": full_path
                         })
+                    
+                    if truncated:
+                        break
+                    
+                    # Add files
                     for name in files:
+                        if len(entries) >= max_entries:
+                            truncated = True
+                            break
                         full_path = os.path.join(root, name)
                         rel_path = os.path.relpath(full_path, path)
                         try:
@@ -675,9 +725,16 @@ class ListDirectoryTool(BaseTool):
                             "path": full_path,
                             "size_bytes": size
                         })
+                    
+                    if truncated:
+                        break
             else:
-                # Non-recursive listing
+                # Non-recursive listing (no filtering needed)
                 for entry in os.listdir(path):
+                    if len(entries) >= max_entries:
+                        truncated = True
+                        break
+                    
                     full_path = os.path.join(path, entry)
                     is_dir = os.path.isdir(full_path)
                     entry_data = {
@@ -692,14 +749,25 @@ class ListDirectoryTool(BaseTool):
                             entry_data["size_bytes"] = 0
                     entries.append(entry_data)
             
+            result = {
+                "path": path,
+                "recursive": recursive,
+                "entries": entries,
+                "count": len(entries),
+                "truncated": truncated
+            }
+            
+            # Add helpful context about filtering/truncation
+            if recursive and excluded_dirs:
+                result["excluded_dirs"] = sorted(excluded_dirs)
+                result["note"] = f"Excluded {len(excluded_dirs)} common bloat directories: {', '.join(sorted(excluded_dirs)[:5])}{'...' if len(excluded_dirs) > 5 else ''}"
+            
+            if truncated:
+                result["warning"] = f"Listing truncated at {max_entries} entries to prevent context overflow. Use non-recursive listing or target specific subdirectories."
+            
             return ToolResult(
                 success=True,
-                result={
-                    "path": path,
-                    "recursive": recursive,
-                    "entries": entries,
-                    "count": len(entries)
-                }
+                result=result
             )
         except PermissionError:
             return ToolResult(
