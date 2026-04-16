@@ -18,6 +18,7 @@ import httpx
 import subprocess
 
 from ollama_client import OllamaClient
+from gemini_client import GeminiClient
 from copilot_client import CopilotClient
 from tool_logic import ToolExecutor
 
@@ -81,10 +82,12 @@ ai_provider = os.getenv("AI_PROVIDER", "ollama").lower()
 if ai_provider == "copilot":
     print("[MAIN AGENT] Using GitHub Copilot CLI as AI provider")
     ai_client = CopilotClient()
+elif ai_provider == "gemini":
+    print("[MAIN AGENT] Using Gemini as AI provider")
+    ai_client = GeminiClient()
 else:
-    print(f"[MAIN AGENT] Using Ollama as AI provider (model: glm-4.7:cloud)")
-    ai_client = OllamaClient(model="glm-4.7:cloud")
-    # OllamaClient(model="qwen3-vl:235b-cloud")
+    print("[MAIN AGENT] Using Gemini-backed Ollama compatibility client")
+    ai_client = OllamaClient()
 
 tool_executor = ToolExecutor()
 
