@@ -12,8 +12,8 @@ from typing import List, Dict, Any, Optional, Tuple
 
 class GeminiClient:
     def __init__(self, model: str = None, api_key: str = None):
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY","AIzaSyDwLSJQtKnodLrXobC8Q_D2U9N3-4UJzYs")
         self.base_url = "https://generativelanguage.googleapis.com"
         self.timeout = 120.0
         self._client = None
@@ -60,8 +60,7 @@ class GeminiClient:
                 model=self.model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    top_p=0.9,
+                    thinking_config=types.ThinkingConfig(thinking_level="medium")
                 ),
             )
 
